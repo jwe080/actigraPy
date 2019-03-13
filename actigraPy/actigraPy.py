@@ -485,11 +485,13 @@ def write_Mtimes(awd_dat,mk_idx,fn_pref,comments=[]):
       fp.write('\n'.join('%s,%s' % ii for ii in all_dt_txt))
 
 
-def get_markers(awd_dat):
+def get_markers(awd_dat,log_fn=[]):
  
    N = awd_dat['N']
    dat = awd_dat['activity']
    fn_pref = awd_dat['hdr']['sub']
+   if not log_fn:   # for back compatibility but can probably leave out
+      log_fn = fn_pref + '_sleeplog.csv'
 
    # get markers indices, and number of markers
    M_idx = [ ii for ii,val in enumerate(awd_dat['M']) if val == 'M']
@@ -562,7 +564,6 @@ def get_markers(awd_dat):
    #print(st_block,tmp,tp_idx[0],tp_idx[1],dat)
    
    # if there is a log file put in the markers and assume they are correct...
-   log_fn = fn_pref + '_sleeplog.csv'
    wM_idx = deepcopy(M_idx)
    keep_idx = []
    log_com = []
