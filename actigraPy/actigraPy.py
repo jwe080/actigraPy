@@ -156,7 +156,7 @@ def write_dat(awd_dat,mk_idx,fn_pref,fn_suff=''):
    # make marker dicts into full length series
    for mm in mk_idx.keys():
       #print(mm)
-      mm_marks = [''] * awd_dat['N']
+      mm_marks = [''] * len(dat)
       for ii in mk_idx[mm]: mm_marks[ii]=mm
 
       tmp = pd.DataFrame({mm:mm_marks})
