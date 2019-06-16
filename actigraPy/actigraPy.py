@@ -94,11 +94,33 @@ def read_marker(fn,awd_dat):
 
 def read_log(fn,awd_dat={}):
 
-    log_dat = pd.read_csv(fn, keep_default_na=False)
+    fn_pref,fn_ext = os.path.splitext(fn)
+    if fn_ext == '.csv':
+        log_dat = pd.read_csv(fn, keep_default_na=False)
+    elif fn_ext == '.xls':
+        log_dat = pd.read_excel(fn)
+
     log_dat = log_dat.to_dict(orient='list')    
 
-    st_time = [ ' '.join(ii) for ii in zip(log_dat['OffDate'],log_dat['OffTime'])]
-    en_time = [ ' '.join(ii) for ii in zip(log_dat['OnDate'],log_dat['OnTime'])]
+    if fn_ext == '.csv':
+        st_time = [ ' '.join(ii) for ii in zip(log_dat['OffDate'],log_dat['OffTime'])]
+        en_time = [ ' '.join(ii) for ii in zip(log_dat['OnDate'],log_dat['OnTime'])]
+    elif fn_ext == '.xls':
+        # big kludge...
+        tmp1 = log_dat['OffDate']
+        tmp1.pop(0)
+        tmp2 = log_dat['OffTime']
+        tmp2.pop(0)
+        print(tmp1,tmp2)
+        st_time = [ dt.datetime.strftime(dt.datetime.combine(ii[0].to_pydatetime().date(),ii[1]),'%d-%b-%y %I:%M %p') for ii in zip(tmp1,tmp2)]
+        tmp1 = log_dat['OnDate']
+        tmp1.pop()
+        tmp2 = log_dat['OnTime']
+        tmp2.pop()
+        en_time = [ dt.datetime.strftime(dt.datetime.combine(ii[0].to_pydatetime().date(),ii[1]),'%d-%b-%y %I:%M %p') for ii in zip(tmp1,tmp2)]
+
+    log_dat['watch_on'] = st_time.pop(0)
+    log_dat['watch_off'] = en_time.pop()
 
     mk_time = [ val for pair in zip(st_time, en_time) for val in pair]
 
@@ -107,6 +129,7 @@ def read_log(fn,awd_dat={}):
     #print(dat[0].values,mk_time)
 
     #mk_idx = {}
+
     log_dat['idx'] =  get_idx(awd_dat['DateTime'],mk_time)
 
     return log_dat
@@ -570,6 +593,9 @@ def get_markers(awd_dat,log_fn=[]):
    if os.path.isfile(log_fn):
       log_dat = read_log(log_fn,awd_dat)
       comments = [ log_dat['idx'][::2],log_dat['Comment']]
+      #comments.pop()   # remove last comment (watch off)
+      #comments.pop(0)   # remove first comment (watch on)
+      #comments = [ log_dat['idx'][::2],log_dat['Comment']]
       # all the log markers are 'right', if there's an M marker nearby, then use it for accuracy,and remove from the working list
       # if not, use the log
       th = 10  # use a more generous window?
@@ -675,7 +701,7 @@ def get_markers(awd_dat,log_fn=[]):
    out_idx['z'] = np.array(z_idx)
    out_idx['m'] = np.array(keep_idx)
    if log_dat:
-      out_idx['l'] = np.array(log_dat['idx'])
+      out_idx['l'] = np.sort(np.array(log_dat['idx']))  # sometimes they're not in order?
  
    return out_idx,comments
 
