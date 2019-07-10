@@ -103,24 +103,18 @@ def read_log(fn,awd_dat={}):
     log_dat = log_dat.to_dict(orient='list')    
 
     if fn_ext == '.csv':
+        # assumes no start/end time rows i.e. Wally format
         st_time = [ ' '.join(ii) for ii in zip(log_dat['OffDate'],log_dat['OffTime'])]
         en_time = [ ' '.join(ii) for ii in zip(log_dat['OnDate'],log_dat['OnTime'])]
     elif fn_ext == '.xls':
-        # big kludge...
-        tmp1 = log_dat['OffDate']
-        tmp1.pop(0)
-        tmp2 = log_dat['OffTime']
-        tmp2.pop(0)
-        print(tmp1,tmp2)
-        st_time = [ dt.datetime.strftime(dt.datetime.combine(ii[0].to_pydatetime().date(),ii[1]),'%d-%b-%y %I:%M %p') for ii in zip(tmp1,tmp2)]
-        tmp1 = log_dat['OnDate']
-        tmp1.pop()
-        tmp2 = log_dat['OnTime']
-        tmp2.pop()
-        en_time = [ dt.datetime.strftime(dt.datetime.combine(ii[0].to_pydatetime().date(),ii[1]),'%d-%b-%y %I:%M %p') for ii in zip(tmp1,tmp2)]
 
-    log_dat['watch_on'] = st_time.pop(0)
-    log_dat['watch_off'] = en_time.pop()
+        st_time = [ dt.datetime.strftime(dt.datetime.combine(ii[0].to_pydatetime().date(),ii[1]),'%d-%b-%y %I:%M %p') for ii in zip(log_dat['OffDate'][1:-1],log_dat['OffTime'][1:-1])]
+        en_time = [ dt.datetime.strftime(dt.datetime.combine(ii[0].to_pydatetime().date(),ii[1]),'%d-%b-%y %I:%M %p') for ii in zip(log_dat['OnDate'][1:-1],log_dat['OnTime'][1:-1])]
+
+    # get the on off times, could be prettier if I added an exception for
+    # processing blanks in datetime conversion
+        log_dat['watch_on'] = dt.datetime.strftime(dt.datetime.combine(log_dat['OnDate'][0].to_pydatetime().date(),log_dat['OnTime'][0]),'%d-%b-%y %I:%M %p')
+        log_dat['watch_on'] = dt.datetime.strftime(dt.datetime.combine(log_dat['OffDate'][0].to_pydatetime().date(),log_dat['OffTime'][-1]),'%d-%b-%y %I:%M %p')
 
     mk_time = [ val for pair in zip(st_time, en_time) for val in pair]
 
@@ -592,10 +586,7 @@ def get_markers(awd_dat,log_fn=[]):
    log_com = []
    if os.path.isfile(log_fn):
       log_dat = read_log(log_fn,awd_dat)
-      comments = [ log_dat['idx'][::2],log_dat['Comment']]
-      #comments.pop()   # remove last comment (watch off)
-      #comments.pop(0)   # remove first comment (watch on)
-      #comments = [ log_dat['idx'][::2],log_dat['Comment']]
+      comments = [ log_dat['idx'][::2],log_dat['Comment'][1:-1]]
       # all the log markers are 'right', if there's an M marker nearby, then use it for accuracy,and remove from the working list
       # if not, use the log
       th = 10  # use a more generous window?
