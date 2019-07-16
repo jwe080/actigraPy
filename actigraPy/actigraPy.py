@@ -72,8 +72,9 @@ def get_idx(dat_time,mk_times):
     return mk_idx
 
 def read_marker(fn,awd_dat):
-
-
+    '''This shouldn't be needed anymore... 
+    '''
+ 
     Mtimes = pd.read_csv(fn,header=None, keep_default_na=False)
 
     # get the idx from the Mtimes file
@@ -85,14 +86,19 @@ def read_marker(fn,awd_dat):
     #M_time = np.array([ ','.join(ii[0:1]) for ii in Mtimes ] )
     mk_idx = {}
     for mm in umks:
-        if mm != 'c':
+        if mm != 'c' and mm != 'C':
            tmp = Mtimes[0][Mtimes[1].isin([mm])]
            tmp = get_idx(awd_dat['DateTime'],tmp)
            mk_idx[mm] = tmp
 
+    # for fixed comments
+    comments = Mtimes[Mtimes[1].isin(['C'])]
+
     return Mtimes, mk_idx
 
 def read_log(fn,awd_dat={}):
+
+    dt_fmt = '%d-%b-%y %I:%M %p'
 
     fn_pref,fn_ext = os.path.splitext(fn)
     if fn_ext == '.csv':
@@ -100,21 +106,38 @@ def read_log(fn,awd_dat={}):
     elif fn_ext == '.xls':
         log_dat = pd.read_excel(fn)
 
+
+    # check for comment column and extract the rows that have the keywords
+    keywords = {'Start':['Start','start'],'End':['End','end']}
+    kw_dat = []
+    for ii in keywords.keys():
+       val = np.where(log_dat.Comment.isin(keywords[ii]))[0]
+       #print(ii,val)
+       kw_dat.append(log_dat.iloc[val])
+       if len(val) > 0:
+          log_dat.drop(log_dat.index[val],inplace=True)
+
+    log_dat['On'] = pd.to_datetime(log_dat['OnDate'].astype(str) +
+                                   ' ' + log_dat['OnTime'].astype(str) )
+    log_dat['Off'] = pd.to_datetime(log_dat['OffDate'].astype(str) + 
+                                    ' ' + log_dat['OffTime'].astype(str) )
+    #log_dat.drop(['OnDate','OnTime','OffDate','OffTime'],inplace=True)
+
     log_dat = log_dat.to_dict(orient='list')    
 
     if fn_ext == '.csv':
-        # assumes no start/end time rows i.e. Wally format
         st_time = [ ' '.join(ii) for ii in zip(log_dat['OffDate'],log_dat['OffTime'])]
         en_time = [ ' '.join(ii) for ii in zip(log_dat['OnDate'],log_dat['OnTime'])]
     elif fn_ext == '.xls':
 
-        st_time = [ dt.datetime.strftime(dt.datetime.combine(ii[0].to_pydatetime().date(),ii[1]),'%d-%b-%y %I:%M %p') for ii in zip(log_dat['OffDate'][1:-1],log_dat['OffTime'][1:-1])]
-        en_time = [ dt.datetime.strftime(dt.datetime.combine(ii[0].to_pydatetime().date(),ii[1]),'%d-%b-%y %I:%M %p') for ii in zip(log_dat['OnDate'][1:-1],log_dat['OnTime'][1:-1])]
+        st_time = [ dt.datetime.strftime(ii,dt_fmt) for ii in log_dat['Off'] ]
+        en_time = [ dt.datetime.strftime(ii,dt_fmt) for ii in log_dat['On'] ]
 
-    # get the on off times, could be prettier if I added an exception for
-    # processing blanks in datetime conversion
-        log_dat['watch_on'] = dt.datetime.strftime(dt.datetime.combine(log_dat['OnDate'][0].to_pydatetime().date(),log_dat['OnTime'][0]),'%d-%b-%y %I:%M %p')
-        log_dat['watch_on'] = dt.datetime.strftime(dt.datetime.combine(log_dat['OffDate'][0].to_pydatetime().date(),log_dat['OffTime'][-1]),'%d-%b-%y %I:%M %p')
+        # get the on off times
+        # also currently assumes kw_dat has length =2...
+        if  len(kw_dat)>0: 
+            log_dat['watch_on'] =  dt.datetime.strftime(dt.datetime.combine(kw_dat[0]['OnDate'].dt.date.values[0],kw_dat[0]['OnTime'].values[0]),dt_fmt)
+            log_dat['watch_off'] =  dt.datetime.strftime(dt.datetime.combine(kw_dat[-1]['OffDate'].dt.date.values[0],kw_dat[-1]['OffTime'].values[0]),dt_fmt)
 
     mk_time = [ val for pair in zip(st_time, en_time) for val in pair]
 
@@ -126,12 +149,12 @@ def read_log(fn,awd_dat={}):
 
     log_dat['idx'] =  get_idx(awd_dat['DateTime'],mk_time)
 
-    return log_dat
+    return log_dat,kw_dat
 
 def write_edited(fn_pref,dat=[],hdr=[],mk_idx=[]):
 
     # get orig data (assumes the script was already run, but then how else 
-    # would they have the Mtimes file.
+    # would they have the /MMtimes file.
     
     if not hdr:
        orig_awd = read_AWD(fn_pref + '.AWD')
@@ -339,7 +362,7 @@ def plot_awd(awd_dat,mk_idx,plot_type='single',comments=[],show=True,fn_pref='',
       #tmp = idat[dd_idx]
       plt.bar(np.arange(delt_idx),idat[min_idx:max_idx],width=1)
 
-      colours = ['red','darkred','blue','gold','purple']
+      colours = ['blue','red','darkred','pink','purple']
       for cc,mm in enumerate(mk_idx.keys()):
          p_idx = np.array(mk_idx[mm])
          n_p = len(p_idx)
@@ -480,27 +503,47 @@ def read_AWD(fn):
 
 def write_Mtimes(awd_dat,mk_idx,fn_pref,comments=[]):
 
+   dt_fmt = "%d-%b-%y %I:%M %p"
+
    # need to build a list of marker idxs and types, then go through the checks below.
    # but markers may be off by a minute.. (fixed - I think)
    all_dt_txt = []
    for mm in mk_idx.keys():
+
+      # convert indices to time
       mm_dt = [ awd_dat['dt_list'][ii] for ii in mk_idx[mm] ]
 
-      # write out marker times the lazy way
-      mm_dt_txt = [ (ii.strftime("%d-%b-%y %I:%M %p"),mm + ',') for ii in mm_dt ]
- 
-      all_dt_txt = all_dt_txt + mm_dt_txt
+      # convert the times to string
+      mm_dt_tmp = [ ii.strftime(dt_fmt) for ii in mm_dt ]
+
+      n = round(len(mm_dt_tmp)/2)
+      # make 'off' and 'on' columns
+      mm_dt_txt = pd.DataFrame(list(zip(mm_dt_tmp[::2],mm_dt_tmp[1::2],[mm]*n)), columns =['Off', 'On','marker'])
+
+      for ii in ['On','Off']:
+         tmp = mm_dt_txt[ii].str.split(" ", n = 1, expand = True)
+         mm_dt_txt[ ii + 'Date'] = tmp[0]
+         mm_dt_txt[ ii + 'Time'] = tmp[1]
+      all_dt_txt.append(mm_dt_txt)
 
    if comments:
-      #print(comments)
-      C_dt_txt = [ (awd_dat['dt_list'][val].strftime("%d-%b-%y %I:%M %p"),'c,' + comments[1][ii]) for ii,val in enumerate(comments[0]) ]
-      all_dt_txt = all_dt_txt + C_dt_txt
 
-   all_dt_txt.sort(key=lambda tup: dt.datetime.strptime(tup[0],"%d-%b-%y %I:%M %p"))
+      C_dt_tmp =  [ awd_dat['dt_list'][val].strftime(dt_fmt) for ii,val in enumerate(comments[0])]
 
-   with open(fn_pref + '_Mtimes.csv', 'w') as fp:
-      fp.write('\n'.join('%s,%s' % ii for ii in all_dt_txt))
+      C_dt_txt = pd.DataFrame(list(zip(C_dt_tmp,['c']*len(comments),comments[1])),columns=['Off','marker','Comment'])
+      tmp = mm_dt_txt[ii].str.split(" ", n = 1, expand = True)
+      C_dt_txt[ 'OffDate'] = tmp[0]
+      C_dt_txt[ 'OffTime'] = tmp[1]
+      all_dt_txt.append(C_dt_txt)
 
+   all_dt = pd.concat(all_dt_txt,join='outer',axis=0,sort=False)
+   all_dt.sort_values(by=['OffDate','OffTime','marker'],ascending=True,inplace=True)
+
+   all_dt = all_dt[['OffDate','OffTime','OnDate','OnTime','marker','comment']]
+   
+   all_dt.to_csv(fn_pref + '_Mtimes.csv', sep=',',index=False)
+
+   return all_dt
 
 def get_markers(awd_dat,log_fn=[]):
  
@@ -585,8 +628,8 @@ def get_markers(awd_dat,log_fn=[]):
    keep_idx = []
    log_com = []
    if os.path.isfile(log_fn):
-      log_dat = read_log(log_fn,awd_dat)
-      comments = [ log_dat['idx'][::2],log_dat['Comment'][1:-1]]
+      log_dat,kw_dat = read_log(log_fn,awd_dat)
+      comments = [ log_dat['idx'][::2],log_dat['Comment']]
       # all the log markers are 'right', if there's an M marker nearby, then use it for accuracy,and remove from the working list
       # if not, use the log
       th = 10  # use a more generous window?
@@ -689,6 +732,7 @@ def get_markers(awd_dat,log_fn=[]):
    z_idx = [ int(ii)  for jj in z_segs for ii in jj]
 
    out_idx = {}
+   out_idx ['M'] = np.array(M_idx)
    out_idx['z'] = np.array(z_idx)
    out_idx['m'] = np.array(keep_idx)
    if log_dat:
