@@ -99,6 +99,7 @@ def read_marker(fn,awd_dat):
 def read_log(fn,awd_dat={}):
 
     dt_fmt = '%d-%b-%y %I:%M %p'
+    comment_mk = ['c','C']
 
     fn_pref,fn_ext = os.path.splitext(fn)
     if fn_ext == '.csv':
@@ -108,6 +109,7 @@ def read_log(fn,awd_dat={}):
 
 
     # check for comment column and extract the rows that have the keywords
+    # this will fail miserably if there is no Comment column...
     keywords = {'Start':['Start','start'],'End':['End','end']}
     kw_dat = []
     for ii in keywords.keys():
@@ -145,11 +147,39 @@ def read_log(fn,awd_dat={}):
 
     #print(dat[0].values,mk_time)
 
-    #mk_idx = {}
 
-    log_dat['idx'] =  get_idx(awd_dat['DateTime'],mk_time)
+    mk_idx =  get_idx(awd_dat['DateTime'],mk_time)
+    if 'marker' in log_dat.keys():
+        um = np.unique(log_dat['marker'])
+        # check for comment markers remove from list
+        c_mk = [ cc for cc in comment_mk if cc in um ]
+        um_not_c = [ ii for ii in um if ii not in comment_mk ] 
+        mk_dict = {}
+        for mm in um_not_c:
+             mm_log_idx = np.where(np.array(log_dat['marker']) == mm)[0]
+             mk_dict[mm] = mk_idx[mm_log_idx]
+        log_dat['mks'] = mk_dict 
+        log_dat['idx'] =  mk_idx
 
-    return log_dat,kw_dat
+        # deal with comments b/c there might be blanks
+        # if there are markers can use c index...  make list if more than c comments...
+        com = []
+        com_idx = []
+        if len(c_mk) > 0:
+            for cc in c_mk:
+                cc_log_idx = np.where(np.array(log_dat['marker']) == cc)[0]
+                com = com + list(np.array(log_dat['Comment'])[cc_log_idx])
+                com_idx = com_idx + list(mk_idx[cc_log_idx])
+            comments = [com_idx, com]   # for compatibility but should be changed...    
+        else:
+            comments = []
+    else:
+        log_dat['idx'] =  mk_idx
+        log_dat['mks'] = {}
+        comments = [ log_dat['idx'][::2],log_dat['Comment']]
+
+
+    return log_dat,kw_dat,comments
 
 def write_edited(fn_pref,dat=[],hdr=[],mk_idx=[]):
 
@@ -530,16 +560,18 @@ def write_Mtimes(awd_dat,mk_idx,fn_pref,comments=[]):
 
       C_dt_tmp =  [ awd_dat['dt_list'][val].strftime(dt_fmt) for ii,val in enumerate(comments[0])]
 
-      C_dt_txt = pd.DataFrame(list(zip(C_dt_tmp,['c']*len(comments),comments[1])),columns=['Off','marker','Comment'])
+      C_dt_txt = pd.DataFrame(list(zip(C_dt_tmp,['c']*len(comments[1]),comments[1])),columns=['Off','marker','Comment'])
       tmp = mm_dt_txt[ii].str.split(" ", n = 1, expand = True)
       C_dt_txt[ 'OffDate'] = tmp[0]
       C_dt_txt[ 'OffTime'] = tmp[1]
+      C_dt_txt[ 'OnDate'] = tmp[0]
+      C_dt_txt[ 'OnTime'] = tmp[1]
       all_dt_txt.append(C_dt_txt)
 
    all_dt = pd.concat(all_dt_txt,join='outer',axis=0,sort=False)
    all_dt.sort_values(by=['OffDate','OffTime','marker'],ascending=True,inplace=True)
 
-   all_dt = all_dt[['OffDate','OffTime','OnDate','OnTime','marker','comment']]
+   all_dt = all_dt[['OffDate','OffTime','OnDate','OnTime','marker','Comment']]
    
    all_dt.to_csv(fn_pref + '_Mtimes.csv', sep=',',index=False)
 
@@ -628,8 +660,7 @@ def get_markers(awd_dat,log_fn=[]):
    keep_idx = []
    log_com = []
    if os.path.isfile(log_fn):
-      log_dat,kw_dat = read_log(log_fn,awd_dat)
-      comments = [ log_dat['idx'][::2],log_dat['Comment']]
+      log_dat,kw_dat,comments = read_log(log_fn,awd_dat)
       # all the log markers are 'right', if there's an M marker nearby, then use it for accuracy,and remove from the working list
       # if not, use the log
       th = 10  # use a more generous window?
