@@ -94,8 +94,33 @@ def read_marker(fn,awd_dat):
     # for fixed comments
     comments = Mtimes[Mtimes[1].isin(['C'])]
 
-    return Mtimes, mk_idx
+    return Mtimes, mk_idx, comments
 
+def read_output(fn,awd_dat):
+    Mtimes = pd.read_csv(fn,header=None, keep_default_na=False)
+
+    # get the idx from the Mtimes file
+    mks = Mtimes.iloc[:,-2]
+    #mks = [ ii[-1] for ii in Mtimes ]
+    umks = np.unique(mks)
+    #print(umks)
+
+    #M_time = np.array([ ','.join(ii[0:1]) for ii in Mtimes ] )
+    mk_idx = {}
+    for mm in umks:
+        if mm != 'c' and mm != 'C':
+           tmp = Mtimes[0][Mtimes[1].isin([mm])]
+           tmp = get_idx(awd_dat['DateTime'],tmp)
+           mk_idx[mm] = tmp
+
+    # for fixed comments
+    comments_str = Mtimes[Mtimes[1].isin(['C'])]
+    tmp = Mtimes[0][Mtimes[1].isin(['C'])]
+    tmp = get_idx(awd_dat['DateTime'],tmp)
+    comments = [tmp, list(comments_str[2])]
+
+    return Mtimes, mk_idx, comments
+    
 def read_log(fn,awd_dat={}):
 
     dt_fmt = '%d-%b-%y %I:%M %p'
@@ -137,8 +162,9 @@ def read_log(fn,awd_dat={}):
 
         # get the on off times
         # also currently assumes kw_dat has length =2...
-        if  len(kw_dat)>0: 
+        if  len(kw_dat[0])>0: 
             log_dat['watch_on'] =  dt.datetime.strftime(dt.datetime.combine(kw_dat[0]['OnDate'].dt.date.values[0],kw_dat[0]['OnTime'].values[0]),dt_fmt)
+        if len(kw_dat[-1])>0:
             log_dat['watch_off'] =  dt.datetime.strftime(dt.datetime.combine(kw_dat[-1]['OffDate'].dt.date.values[0],kw_dat[-1]['OffTime'].values[0]),dt_fmt)
 
     mk_time = [ val for pair in zip(st_time, en_time) for val in pair]
@@ -392,7 +418,7 @@ def plot_awd(awd_dat,mk_idx,plot_type='single',comments=[],show=True,fn_pref='',
       #tmp = idat[dd_idx]
       plt.bar(np.arange(delt_idx),idat[min_idx:max_idx],width=1)
 
-      colours = ['blue','red','darkred','pink','purple']
+      colours = ['blue','red','darkred','pink','lightcyan']
       for cc,mm in enumerate(mk_idx.keys()):
          p_idx = np.array(mk_idx[mm])
          n_p = len(p_idx)
@@ -437,9 +463,12 @@ def plot_awd(awd_dat,mk_idx,plot_type='single',comments=[],show=True,fn_pref='',
          c_idx = np.where(np.logical_and(np.abs(com_idx)<=max_idx,np.abs(com_idx)>=min_idx))
          if debug:
             print(c_idx[0])
+         tracker =0
          if len(c_idx[0]) >0:
             for cc in c_idx[0]:
-               ax.text(np.abs(com_idx[cc])-min_idx,250,com_txt[cc])
+               tracker=tracker+1
+               stagger = tracker%2 * 100 
+               ax.text(np.abs(com_idx[cc])-min_idx,200+stagger,com_txt[cc])
       
       ax.set_ylabel(day)
       ax.set_xticks(np.arange(0,delt_idx,60))
@@ -532,7 +561,6 @@ def read_AWD(fn):
 
 
 def write_Mtimes(awd_dat,mk_idx,fn_pref,comments=[]):
-
    dt_fmt = "%d-%b-%y %I:%M %p"
 
    # need to build a list of marker idxs and types, then go through the checks below.
@@ -549,7 +577,7 @@ def write_Mtimes(awd_dat,mk_idx,fn_pref,comments=[]):
       n = round(len(mm_dt_tmp)/2)
       # make 'off' and 'on' columns
       mm_dt_txt = pd.DataFrame(list(zip(mm_dt_tmp[::2],mm_dt_tmp[1::2],[mm]*n)), columns =['Off', 'On','marker'])
-
+      
       for ii in ['On','Off']:
          tmp = mm_dt_txt[ii].str.split(" ", n = 1, expand = True)
          mm_dt_txt[ ii + 'Date'] = tmp[0]
