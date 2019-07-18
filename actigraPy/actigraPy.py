@@ -363,7 +363,7 @@ def despike(dat,zlev=4,win=2):
 
 def plot_awd(awd_dat,mk_idx,plot_type='single',comments=[],show=True,fn_pref='',max_act=-1,debug=False):
 #def plot_awd(DateTime,idat,list_idx,plot_type='single',comments=[],show=True,fn_pref='',max_act=-1,debug=False):
-
+    #add option to specify com type
    idat = awd_dat['activity']
 
    # want to plot activity data by day
@@ -456,19 +456,22 @@ def plot_awd(awd_dat,mk_idx,plot_type='single',comments=[],show=True,fn_pref='',
             #for mm in M_idx[m_idx]:
             #   ax.text(mm-min_idx,idat[mm],'M')
                #print(mm)
- 
+      if max_act > 0:
+         ax.set_ylim([0,max_act])
+         comment_height = max_act/2
+      else:
+         comment_height = 250
       if len(comments)>0:
          com_idx = np.array(comments[0])
          com_txt = np.array(comments[1])
+         #com_type = np.array(comments[2])
          c_idx = np.where(np.logical_and(np.abs(com_idx)<=max_idx,np.abs(com_idx)>=min_idx))
          if debug:
             print(c_idx[0])
          tracker =0
          if len(c_idx[0]) >0:
             for cc in c_idx[0]:
-               tracker=tracker+1
-               stagger = tracker%2 * 100 
-               ax.text(np.abs(com_idx[cc])-min_idx,200+stagger,com_txt[cc])
+               ax.text(np.abs(com_idx[cc])-min_idx,comment_height,com_txt[cc])
       
       ax.set_ylabel(day)
       ax.set_xticks(np.arange(0,delt_idx,60))
@@ -480,8 +483,6 @@ def plot_awd(awd_dat,mk_idx,plot_type='single',comments=[],show=True,fn_pref='',
       ax.spines["top"].set_visible(False)
       ax.spines["right"].set_visible(False)
       ax.spines["bottom"].set_visible(False)
-      if max_act > 0:
-         ax.set_ylim([0,max_act])
       
 
    plt.tight_layout()
@@ -587,8 +588,7 @@ def write_Mtimes(awd_dat,mk_idx,fn_pref,comments=[]):
    if comments:
 
       C_dt_tmp =  [ awd_dat['dt_list'][val].strftime(dt_fmt) for ii,val in enumerate(comments[0])]
-
-      C_dt_txt = pd.DataFrame(list(zip(C_dt_tmp,['c']*len(comments[1]),comments[1])),columns=['Off','marker','Comment'])
+      C_dt_txt = pd.DataFrame(list(zip(C_dt_tmp,comments[2],comments[1])),columns=['Off','marker','Comment'])
       tmp = mm_dt_txt[ii].str.split(" ", n = 1, expand = True)
       C_dt_txt[ 'OffDate'] = tmp[0]
       C_dt_txt[ 'OffTime'] = tmp[1]
