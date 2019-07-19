@@ -479,6 +479,7 @@ def plot_awd(awd_dat,mk_idx,plot_type='single',comments=[],show=True,fn_pref='',
          if debug:
             print(c_idx[0])
          if len(c_idx[0]) >0:
+<<<<<<< HEAD
             for ii,cc in enumerate(c_idx[0]):
                ax.text(np.abs(com_idx[cc])-min_idx,comment_height,com_txt[cc])
                #jitter = (ii % 2)*50
@@ -489,6 +490,19 @@ def plot_awd(awd_dat,mk_idx,plot_type='single',comments=[],show=True,fn_pref='',
                #else:
                #   ax.text(np.abs(com_idx[cc])-min_idx,250+jitter,com_txt[cc])
 
+=======
+            for cc in c_idx[0]:
+               ax.text(np.abs(com_idx[cc])-min_idx,comment_height,com_txt[cc])
+            # if comment types are needed...
+            #for ii,cc in enumerate(c_idx[0]):
+            #   jitter = (ii % 2)*50
+            #   if com_type[cc] == 'CC':
+            #      ax.text(np.abs(com_idx[cc])-min_idx,350+jitter,com_txt[cc],color='blue')
+            #   elif com_type[cc] == 'C':      
+            #      ax.text(np.abs(com_idx[cc])-min_idx,150+jitter,com_txt[cc],color='purple')
+            #   else:
+            #      ax.text(np.abs(com_idx[cc])-min_idx,250+jitter,com_txt[cc])
+>>>>>>> 4f19c6dfacf0799730fb5e726cc76ca1800d9bfc
 
       ax.set_ylabel(day)
       ax.set_xticks(np.arange(0,delt_idx,60))
@@ -500,6 +514,10 @@ def plot_awd(awd_dat,mk_idx,plot_type='single',comments=[],show=True,fn_pref='',
       ax.spines["top"].set_visible(False)
       ax.spines["right"].set_visible(False)
       ax.spines["bottom"].set_visible(False)
+<<<<<<< HEAD
+=======
+
+>>>>>>> 4f19c6dfacf0799730fb5e726cc76ca1800d9bfc
       if max_act > 0:
          ax.set_ylim([0,max_act])
 
@@ -509,7 +527,12 @@ def plot_awd(awd_dat,mk_idx,plot_type='single',comments=[],show=True,fn_pref='',
       mm_patch = mpatches.Patch(color=colours[np.mod(cc,len(colours))], label=mm,alpha=0.3)
       all_patch.append(mm_patch) 
       plt.legend(handles=all_patch)
+<<<<<<< HEAD
       
+=======
+
+
+>>>>>>> 4f19c6dfacf0799730fb5e726cc76ca1800d9bfc
    plt.tight_layout()
 
    #if not fn_pref: fn_pref = 'test'
