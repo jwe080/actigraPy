@@ -480,7 +480,7 @@ def plot_awd(awd_dat,mk_idx,plot_type='single',comments=[],show=True,fn_pref='',
             print(c_idx[0])
          if len(c_idx[0]) >0:
             for ii,cc in enumerate(c_idx[0]):
-               ax.text(np.abs(com_idx[cc])-min_idx,comment_height+jitter,com_txt[cc])
+               ax.text(np.abs(com_idx[cc])-min_idx,comment_height,com_txt[cc])
                #jitter = (ii % 2)*50
                #if com_type[cc] == 'CC':
                #   ax.text(np.abs(com_idx[cc])-min_idx,350+jitter,com_txt[cc],color='blue')
