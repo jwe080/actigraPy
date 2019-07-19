@@ -13,6 +13,7 @@ import os, sys
 import datetime as dt
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 from scipy.stats import zscore
 from copy import deepcopy
 import csv
@@ -100,7 +101,7 @@ def read_marker(fn,awd_dat):
     # for fixed comments
     comments = Mtimes[Mtimes[1].isin(['C'])]
 
-    return Mtimes, mk_idx
+    return Mtimes, mk_idx, comments
 
 def read_log(fn,awd_dat={}):
 
@@ -438,17 +439,25 @@ def plot_awd(awd_dat,mk_idx,plot_type='single',comments=[],show=True,fn_pref='',
             #for mm in M_idx[m_idx]:
             #   ax.text(mm-min_idx,idat[mm],'M')
                #print(mm)
- 
+
       if len(comments)>0:
          com_idx = np.array(comments[0])
          com_txt = np.array(comments[1])
+         com_type = np.array(comments[2])
          c_idx = np.where(np.logical_and(np.abs(com_idx)<=max_idx,np.abs(com_idx)>=min_idx))
          if debug:
             print(c_idx[0])
          if len(c_idx[0]) >0:
-            for cc in c_idx[0]:
-               ax.text(np.abs(com_idx[cc])-min_idx,250,com_txt[cc])
-      
+            for ii,cc in enumerate(c_idx[0]):
+               jitter = (ii % 2)*50
+               if com_type[cc] == 'CC':
+                  ax.text(np.abs(com_idx[cc])-min_idx,350+jitter,com_txt[cc],color='blue')
+               elif com_type[cc] == 'C':      
+                  ax.text(np.abs(com_idx[cc])-min_idx,150+jitter,com_txt[cc],color='purple')
+               else:
+                  ax.text(np.abs(com_idx[cc])-min_idx,250+jitter,com_txt[cc])
+
+
       ax.set_ylabel(day)
       ax.set_xticks(np.arange(0,delt_idx,60))
       if plot_type=='double':
@@ -461,7 +470,13 @@ def plot_awd(awd_dat,mk_idx,plot_type='single',comments=[],show=True,fn_pref='',
       ax.spines["bottom"].set_visible(False)
       if max_act > 0:
          ax.set_ylim([0,max_act])
-      
+
+   # legend, do once for all keys
+   all_patch = [] # for legend
+   for cc,mm in enumerate(mk_idx.keys()):
+      mm_patch = mpatches.Patch(color=colours[np.mod(cc,len(colours))], label=mm,alpha=0.3)
+      all_patch.append(mm_patch) 
+      plt.legend(handles=all_patch)
 
    plt.tight_layout()
 
