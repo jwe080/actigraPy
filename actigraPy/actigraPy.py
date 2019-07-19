@@ -103,6 +103,31 @@ def read_marker(fn,awd_dat):
 
     return Mtimes, mk_idx, comments
 
+def read_output(fn,awd_dat):
+    Mtimes = pd.read_csv(fn,header=None, keep_default_na=False)
+
+    # get the idx from the Mtimes file
+    mks = Mtimes.iloc[:,-2]
+    #mks = [ ii[-1] for ii in Mtimes ]
+    umks = np.unique(mks)
+    #print(umks)
+
+    #M_time = np.array([ ','.join(ii[0:1]) for ii in Mtimes ] )
+    mk_idx = {}
+    for mm in umks:
+        if mm != 'c' and mm != 'C':
+           tmp = Mtimes[0][Mtimes[1].isin([mm])]
+           tmp = get_idx(awd_dat['DateTime'],tmp)
+           mk_idx[mm] = tmp
+
+    # for fixed comments
+    comments_str = Mtimes[Mtimes[1].isin(['C'])]
+    tmp = Mtimes[0][Mtimes[1].isin(['C'])]
+    tmp = get_idx(awd_dat['DateTime'],tmp)
+    comments = [tmp, list(comments_str[2])]
+
+    return Mtimes, mk_idx, comments
+    
 def read_log(fn,awd_dat={}):
 
     dt_fmt = '%d-%b-%y %I:%M %p'
@@ -146,8 +171,9 @@ def read_log(fn,awd_dat={}):
 
         # get the on off times
         # also currently assumes kw_dat has length =2...
-        if  len(kw_dat)>0: 
+        if  len(kw_dat[0])>0: 
             log_dat['watch_on'] =  dt.datetime.strftime(dt.datetime.combine(kw_dat[0]['OnDate'].dt.date.values[0],kw_dat[0]['OnTime'].values[0]),dt_fmt)
+        if len(kw_dat[-1])>0:
             log_dat['watch_off'] =  dt.datetime.strftime(dt.datetime.combine(kw_dat[-1]['OffDate'].dt.date.values[0],kw_dat[-1]['OffTime'].values[0]),dt_fmt)
 
     mk_time = [ val for pair in zip(st_time, en_time) for val in pair]
@@ -346,7 +372,7 @@ def despike(dat,zlev=4,win=2):
 
 def plot_awd(awd_dat,mk_idx,plot_type='single',comments=[],show=True,fn_pref='',max_act=-1,debug=False):
 #def plot_awd(DateTime,idat,list_idx,plot_type='single',comments=[],show=True,fn_pref='',max_act=-1,debug=False):
-
+    #add option to specify com type
    idat = awd_dat['activity']
 
    # want to plot activity data by day
@@ -401,7 +427,7 @@ def plot_awd(awd_dat,mk_idx,plot_type='single',comments=[],show=True,fn_pref='',
       #tmp = idat[dd_idx]
       plt.bar(np.arange(delt_idx),idat[min_idx:max_idx],width=1)
 
-      colours = ['blue','red','darkred','pink','purple']
+      colours = ['blue','red','darkred','pink','lightcyan']
       for cc,mm in enumerate(mk_idx.keys()):
          p_idx = np.array(mk_idx[mm])
          n_p = len(p_idx)
@@ -440,22 +466,28 @@ def plot_awd(awd_dat,mk_idx,plot_type='single',comments=[],show=True,fn_pref='',
             #   ax.text(mm-min_idx,idat[mm],'M')
                #print(mm)
 
+      if max_act > 0:
+         ax.set_ylim([0,max_act])
+         comment_height = max_act/2
+      else:
+         comment_height = 250
       if len(comments)>0:
          com_idx = np.array(comments[0])
          com_txt = np.array(comments[1])
-         com_type = np.array(comments[2])
+         #com_type = np.array(comments[2])
          c_idx = np.where(np.logical_and(np.abs(com_idx)<=max_idx,np.abs(com_idx)>=min_idx))
          if debug:
             print(c_idx[0])
          if len(c_idx[0]) >0:
             for ii,cc in enumerate(c_idx[0]):
-               jitter = (ii % 2)*50
-               if com_type[cc] == 'CC':
-                  ax.text(np.abs(com_idx[cc])-min_idx,350+jitter,com_txt[cc],color='blue')
-               elif com_type[cc] == 'C':      
-                  ax.text(np.abs(com_idx[cc])-min_idx,150+jitter,com_txt[cc],color='purple')
-               else:
-                  ax.text(np.abs(com_idx[cc])-min_idx,250+jitter,com_txt[cc])
+               ax.text(np.abs(com_idx[cc])-min_idx,comment_height+jitter,com_txt[cc])
+               #jitter = (ii % 2)*50
+               #if com_type[cc] == 'CC':
+               #   ax.text(np.abs(com_idx[cc])-min_idx,350+jitter,com_txt[cc],color='blue')
+               #elif com_type[cc] == 'C':      
+               #   ax.text(np.abs(com_idx[cc])-min_idx,150+jitter,com_txt[cc],color='purple')
+               #else:
+               #   ax.text(np.abs(com_idx[cc])-min_idx,250+jitter,com_txt[cc])
 
 
       ax.set_ylabel(day)
@@ -477,7 +509,7 @@ def plot_awd(awd_dat,mk_idx,plot_type='single',comments=[],show=True,fn_pref='',
       mm_patch = mpatches.Patch(color=colours[np.mod(cc,len(colours))], label=mm,alpha=0.3)
       all_patch.append(mm_patch) 
       plt.legend(handles=all_patch)
-
+      
    plt.tight_layout()
 
    #if not fn_pref: fn_pref = 'test'
@@ -555,7 +587,6 @@ def read_AWD(fn):
 
 
 def write_Mtimes(awd_dat,mk_idx,fn_pref,comments=[]):
-
    dt_fmt = "%d-%b-%y %I:%M %p"
 
    # need to build a list of marker idxs and types, then go through the checks below.
@@ -572,7 +603,7 @@ def write_Mtimes(awd_dat,mk_idx,fn_pref,comments=[]):
       n = round(len(mm_dt_tmp)/2)
       # make 'off' and 'on' columns
       mm_dt_txt = pd.DataFrame(list(zip(mm_dt_tmp[::2],mm_dt_tmp[1::2],[mm]*n)), columns =['Off', 'On','marker'])
-
+      
       for ii in ['On','Off']:
          tmp = mm_dt_txt[ii].str.split(" ", n = 1, expand = True)
          mm_dt_txt[ ii + 'Date'] = tmp[0]
@@ -582,8 +613,7 @@ def write_Mtimes(awd_dat,mk_idx,fn_pref,comments=[]):
    if comments:
 
       C_dt_tmp =  [ awd_dat['dt_list'][val].strftime(dt_fmt) for ii,val in enumerate(comments[0])]
-
-      C_dt_txt = pd.DataFrame(list(zip(C_dt_tmp,['c']*len(comments[1]),comments[1])),columns=['Off','marker','Comment'])
+      C_dt_txt = pd.DataFrame(list(zip(C_dt_tmp,comments[2],comments[1])),columns=['Off','marker','Comment'])
       tmp = mm_dt_txt[ii].str.split(" ", n = 1, expand = True)
       C_dt_txt[ 'OffDate'] = tmp[0]
       C_dt_txt[ 'OffTime'] = tmp[1]
