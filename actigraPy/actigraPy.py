@@ -13,6 +13,7 @@ import os, sys
 import datetime as dt
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 from scipy.stats import zscore
 from copy import deepcopy
 import csv
@@ -52,7 +53,7 @@ def read_dat(fn_pref):
 
     return dat,marker_idx
 
-def get_idx(dat_time,mk_times):
+def get_idx(dat_time,mk_times,pos=False):
     """
     from a data file with times and marker times in the same format, return indices for all the markers
     """
@@ -60,16 +61,22 @@ def get_idx(dat_time,mk_times):
     dat_time = list(dat_time)
 
     tmp = []
+    exist = []
     for ii in mk_times:
         try:
             tmp.append(dat_time.index(ii))  
+            exist.append(True)
         except:
+            exist.append(False)
             print('warning: missing index ' + str(ii))
             pass   # this happens if the data was clipped...
 
     mk_idx = np.array(tmp)
-    
-    return mk_idx
+
+    if pos:
+       return mk_idx,exist
+    else:
+       return mk_idx
 
 def read_marker(fn,awd_dat):
     '''This shouldn't be needed anymore... 
@@ -140,9 +147,11 @@ def read_log(fn,awd_dat={}):
     for ii in keywords.keys():
        val = np.where(log_dat.Comment.isin(keywords[ii]))[0]
        #print(ii,val)
-       kw_dat.append(log_dat.iloc[val])
        if len(val) > 0:
+          kw_dat.append(log_dat.iloc[val])
           log_dat.drop(log_dat.index[val],inplace=True)
+
+     
 
     log_dat['On'] = pd.to_datetime(log_dat['OnDate'].astype(str) +
                                    ' ' + log_dat['OnTime'].astype(str) )
@@ -174,7 +183,7 @@ def read_log(fn,awd_dat={}):
     #print(dat[0].values,mk_time)
 
 
-    mk_idx =  get_idx(awd_dat['DateTime'],mk_time)
+    mk_idx, pos =  get_idx(awd_dat['DateTime'],mk_time,pos=True)
     if 'marker' in log_dat.keys():
         um = np.unique(log_dat['marker'])
         # check for comment markers remove from list
@@ -202,7 +211,7 @@ def read_log(fn,awd_dat={}):
     else:
         log_dat['idx'] =  mk_idx
         log_dat['mks'] = {}
-        comments = [ log_dat['idx'][::2],log_dat['Comment']]
+        comments = [ log_dat['idx'][::2],list(np.array(log_dat['Comment'])[pos[::2]])]
 
 
     return log_dat,kw_dat,comments
@@ -456,6 +465,7 @@ def plot_awd(awd_dat,mk_idx,plot_type='single',comments=[],show=True,fn_pref='',
             #for mm in M_idx[m_idx]:
             #   ax.text(mm-min_idx,idat[mm],'M')
                #print(mm)
+
       if max_act > 0:
          ax.set_ylim([0,max_act])
          comment_height = max_act/2
@@ -472,7 +482,16 @@ def plot_awd(awd_dat,mk_idx,plot_type='single',comments=[],show=True,fn_pref='',
          if len(c_idx[0]) >0:
             for cc in c_idx[0]:
                ax.text(np.abs(com_idx[cc])-min_idx,comment_height,com_txt[cc])
-      
+            # if comment types are needed...
+            #for ii,cc in enumerate(c_idx[0]):
+            #   jitter = (ii % 2)*50
+            #   if com_type[cc] == 'CC':
+            #      ax.text(np.abs(com_idx[cc])-min_idx,350+jitter,com_txt[cc],color='blue')
+            #   elif com_type[cc] == 'C':      
+            #      ax.text(np.abs(com_idx[cc])-min_idx,150+jitter,com_txt[cc],color='purple')
+            #   else:
+            #      ax.text(np.abs(com_idx[cc])-min_idx,250+jitter,com_txt[cc])
+
       ax.set_ylabel(day)
       ax.set_xticks(np.arange(0,delt_idx,60))
       if plot_type=='double':
@@ -483,7 +502,17 @@ def plot_awd(awd_dat,mk_idx,plot_type='single',comments=[],show=True,fn_pref='',
       ax.spines["top"].set_visible(False)
       ax.spines["right"].set_visible(False)
       ax.spines["bottom"].set_visible(False)
-      
+
+      if max_act > 0:
+         ax.set_ylim([0,max_act])
+
+   # legend, do once for all keys
+   all_patch = [] # for legend
+   for cc,mm in enumerate(mk_idx.keys()):
+      mm_patch = mpatches.Patch(color=colours[np.mod(cc,len(colours))], label=mm,alpha=0.3)
+      all_patch.append(mm_patch) 
+      plt.legend(handles=all_patch)
+
 
    plt.tight_layout()
 
