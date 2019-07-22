@@ -184,7 +184,10 @@ def read_log(fn,awd_dat={}):
             for cc in c_mk:
                 cc_log_idx = np.where(np.array(log_dat['marker']) == cc)[0]
                 cc_idx, pos =  get_idx(awd_dat['DateTime'],st_time[cc_log_idx],pos=True)
-                com = com + list(np.array(log_dat['Comment'])[cc_log_idx])
+                indices = [i for i, x in enumerate[pos] if pos ==True]
+                add_com = list(np.array(log_dat['Comment'])[cc_log_idx])
+                for y in indices:
+                    com.append(add_com[y])
                 #com_idx = com_idx + list(mk_idx[cc_log_idx])
                 com_idx.extend(cc_idx)
             comments = [com_idx, com]   # for compatibility but should be changed...    
@@ -477,7 +480,7 @@ def plot_awd(awd_dat,mk_idx,plot_type='single',comments=[],show=True,fn_pref='',
             print(c_idx[0])
          if len(c_idx[0]) >0:
             for ii,cc in enumerate(c_idx[0]):
-               jitter = (ii % 2) * 50
+               jitter = (ii % 2) * comment_height // 4
                ax.text(np.abs(com_idx[cc])-min_idx,comment_height+jitter,com_txt[cc])
                # if comment types are needed...
                #jitter = (ii % 2)*50
