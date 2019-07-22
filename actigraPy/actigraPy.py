@@ -103,31 +103,6 @@ def read_marker(fn,awd_dat):
     comments = Mtimes[Mtimes[1].isin(['C'])]
 
     return Mtimes, mk_idx, comments
-
-def read_output(fn,awd_dat):
-    Mtimes = pd.read_csv(fn,header=None, keep_default_na=False)
-
-    # get the idx from the Mtimes file
-    mks = Mtimes.iloc[:,-2]
-    #mks = [ ii[-1] for ii in Mtimes ]
-    umks = np.unique(mks)
-    #print(umks)
-
-    #M_time = np.array([ ','.join(ii[0:1]) for ii in Mtimes ] )
-    mk_idx = {}
-    for mm in umks:
-        if mm != 'c' and mm != 'C':
-           tmp = Mtimes[0][Mtimes[1].isin([mm])]
-           tmp = get_idx(awd_dat['DateTime'],tmp)
-           mk_idx[mm] = tmp
-
-    # for fixed comments
-    comments_str = Mtimes[Mtimes[1].isin(['C'])]
-    tmp = Mtimes[0][Mtimes[1].isin(['C'])]
-    tmp = get_idx(awd_dat['DateTime'],tmp)
-    comments = [tmp, list(comments_str[2])]
-
-    return Mtimes, mk_idx, comments
     
 def read_log(fn,awd_dat={}):
 
@@ -502,7 +477,8 @@ def plot_awd(awd_dat,mk_idx,plot_type='single',comments=[],show=True,fn_pref='',
             print(c_idx[0])
          if len(c_idx[0]) >0:
             for ii,cc in enumerate(c_idx[0]):
-               ax.text(np.abs(com_idx[cc])-min_idx,comment_height,com_txt[cc])
+               jitter = (ii % 2) * 50
+               ax.text(np.abs(com_idx[cc])-min_idx,comment_height+jitter,com_txt[cc])
                # if comment types are needed...
                #jitter = (ii % 2)*50
                #if com_type[cc] == 'CC':
