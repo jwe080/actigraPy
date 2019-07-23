@@ -423,8 +423,13 @@ def plot_awd(awd_dat,mk_idx,plot_type='single',comments=[],show=True,fn_pref='',
       if debug:
         print(min_idx,max_idx)
 
-      #tmp = idat[dd_idx]
-      plt.bar(np.arange(delt_idx),idat[min_idx:max_idx],width=1)
+      #tmp = idat[dd_idx] 
+      if dd == 0:
+          offset = 1439-max_idx
+          delt_idx = 1439
+      else:
+          offset =0
+      plt.bar(np.arange(offset,delt_idx),idat[min_idx:max_idx],width=1)
 
       colours = ['blue','red','darkred','pink','lightcyan']
       for cc,mm in enumerate(mk_idx.keys()):
@@ -481,7 +486,7 @@ def plot_awd(awd_dat,mk_idx,plot_type='single',comments=[],show=True,fn_pref='',
          if len(c_idx[0]) >0:
             for ii,cc in enumerate(c_idx[0]):
                jitter = (ii % 2) * comment_height // 4
-               ax.text(np.abs(com_idx[cc])-min_idx,comment_height+jitter,com_txt[cc])
+               ax.text(np.abs(com_idx[cc])-min_idx+offset,comment_height+jitter,com_txt[cc])
                # if comment types are needed...
                #jitter = (ii % 2)*50
                #if com_type[cc] == 'CC':
@@ -492,7 +497,7 @@ def plot_awd(awd_dat,mk_idx,plot_type='single',comments=[],show=True,fn_pref='',
                #   ax.text(np.abs(com_idx[cc])-min_idx,250+jitter,com_txt[cc])
 
       ax.set_ylabel(day)
-      ax.set_xticks(np.arange(0,delt_idx,60))
+      ax.set_xticks(np.arange(0,1439,60))
       if plot_type=='double':
          ax.set_xticklabels(list(np.arange(24))*2)
       else:
