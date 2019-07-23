@@ -465,7 +465,7 @@ def plot_awd(awd_dat,mk_idx,plot_type='single',comments=[],show=True,fn_pref='',
                
             tmp = zip(tmp_s,tmp_e)
             for ii in tmp:
-               ax.axvspan(np.abs(ii[0])-min_idx,np.abs(ii[1])-min_idx , alpha=0.3, color=colours[np.mod(cc,len(colours))])
+               ax.axvspan(np.abs(ii[0])-min_idx+offset,np.abs(ii[1])-min_idx +offset, alpha=0.3, color=colours[np.mod(cc,len(colours))])
             #for mm in M_idx[m_idx]:
             #   ax.text(mm-min_idx,idat[mm],'M')
                #print(mm)
