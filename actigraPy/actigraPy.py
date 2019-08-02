@@ -103,31 +103,6 @@ def read_marker(fn,awd_dat):
     comments = Mtimes[Mtimes[1].isin(['C'])]
 
     return Mtimes, mk_idx, comments
-
-def read_output(fn,awd_dat):
-    Mtimes = pd.read_csv(fn,header=None, keep_default_na=False)
-
-    # get the idx from the Mtimes file
-    mks = Mtimes.iloc[:,-2]
-    #mks = [ ii[-1] for ii in Mtimes ]
-    umks = np.unique(mks)
-    #print(umks)
-
-    #M_time = np.array([ ','.join(ii[0:1]) for ii in Mtimes ] )
-    mk_idx = {}
-    for mm in umks:
-        if mm != 'c' and mm != 'C':
-           tmp = Mtimes[0][Mtimes[1].isin([mm])]
-           tmp = get_idx(awd_dat['DateTime'],tmp)
-           mk_idx[mm] = tmp
-
-    # for fixed comments
-    comments_str = Mtimes[Mtimes[1].isin(['C'])]
-    tmp = Mtimes[0][Mtimes[1].isin(['C'])]
-    tmp = get_idx(awd_dat['DateTime'],tmp)
-    comments = [tmp, list(comments_str[2])]
-
-    return Mtimes, mk_idx, comments
     
 def read_log(fn,awd_dat={}):
 
@@ -210,6 +185,10 @@ def read_log(fn,awd_dat={}):
                 cc_log_idx = np.where(np.array(log_dat['marker']) == cc)[0]
                 cc_idx, pos =  get_idx(awd_dat['DateTime'],st_time[cc_log_idx],pos=True)
                 com = com + list(np.array(log_dat['Comment'])[cc_log_idx])
+                indices = [i for i, x in enumerate[pos] if pos ==True]
+                add_com = list(np.array(log_dat['Comment'])[cc_log_idx])
+                for y in indices:
+                    com.append(add_com[y])
                 #com_idx = com_idx + list(mk_idx[cc_log_idx])
                 com_idx.extend(cc_idx)
             comments = [com_idx, com]   # for compatibility but should be changed...    
@@ -482,7 +461,7 @@ def plot_awd(awd_dat,mk_idx,plot_type='single',comments=[],show=True,fn_pref='',
                
             tmp = zip(tmp_s,tmp_e)
             for ii in tmp:
-               ax.axvspan(np.abs(ii[0])-min_idx,np.abs(ii[1])-min_idx , alpha=0.3, color=colours[np.mod(cc,len(colours))])
+               ax.axvspan(np.abs(ii[0])-min_idx+offset,np.abs(ii[1])-min_idx +offset, alpha=0.3, color=colours[np.mod(cc,len(colours))])
             #for mm in M_idx[m_idx]:
             #   ax.text(mm-min_idx,idat[mm],'M')
                #print(mm)
@@ -502,7 +481,8 @@ def plot_awd(awd_dat,mk_idx,plot_type='single',comments=[],show=True,fn_pref='',
             print(c_idx[0])
          if len(c_idx[0]) >0:
             for ii,cc in enumerate(c_idx[0]):
-               ax.text(np.abs(com_idx[cc])-min_idx,comment_height,com_txt[cc])
+               jitter = (ii % 2) * comment_height // 4
+               ax.text(np.abs(com_idx[cc])-min_idx,comment_height+jitter,com_txt[cc])
                # if comment types are needed...
                #jitter = (ii % 2)*50
                #if com_type[cc] == 'CC':
@@ -612,8 +592,13 @@ def write_Mtimes(awd_dat,mk_idx,fn_pref,comments=[]):
    # need to build a list of marker idxs and types, then go through the checks below.
    # but markers may be off by a minute.. (fixed - I think)
    all_dt_txt = []
+   #clumsy fix -- find a better way?
+   if 'M' in mk_idx.keys():    
+       if len(mk_idx['M']) == 0:
+           del mk_idx['M']
+           del mk_idx['m']
    for mm in mk_idx.keys():
-
+      print(mm)
       # convert indices to time
       mm_dt = [ awd_dat['dt_list'][ii] for ii in mk_idx[mm] ]
 
@@ -739,18 +724,18 @@ def get_markers(awd_dat,log_fn=[]):
       log_dat,kw_dat,comments = read_log(log_fn,awd_dat)
       # all the log markers are 'right', if there's an M marker nearby, then use it for accuracy,and remove from the working list
       # if not, use the log
-      th = 10  # use a more generous window?
-    
-      for ii,ll in enumerate(log_dat['idx']):
-         ll = np.abs(ll)
-         match_idx_M,loc_idx = find_nearest(wM_idx,ll)
-         #print(match_idx_M,ll)
-         if np.abs(match_idx_M-ll) < th:
-            #print(loc_idx)
-            keep_idx.append(match_idx_M)
-            del(wM_idx[loc_idx])   # remove it from the working M_idx list for below
-         else:
-            keep_idx.append(ll)
+      if len(wM_idx)>0:
+          th = 10  # use a more generous window?
+          for ii,ll in enumerate(log_dat['idx']):
+             ll = np.abs(ll)
+             match_idx_M,loc_idx = find_nearest(wM_idx,ll)
+             #print(match_idx_M,ll)
+             if np.abs(match_idx_M-ll) < th:
+                #print(loc_idx)
+                keep_idx.append(match_idx_M)
+                del(wM_idx[loc_idx])   # remove it from the working M_idx list for below
+             else:
+                keep_idx.append(ll)
    else:
        log_dat = {}
        comments = []
