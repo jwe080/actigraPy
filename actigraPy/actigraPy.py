@@ -592,8 +592,13 @@ def write_Mtimes(awd_dat,mk_idx,fn_pref,comments=[]):
    # need to build a list of marker idxs and types, then go through the checks below.
    # but markers may be off by a minute.. (fixed - I think)
    all_dt_txt = []
+   #clumsy fix -- find a better way?
+   if 'M' in mk_idx.keys():    
+       if len(mk_idx['M']) == 0:
+           del mk_idx['M']
+           del mk_idx['m']
    for mm in mk_idx.keys():
-
+      print(mm)
       # convert indices to time
       mm_dt = [ awd_dat['dt_list'][ii] for ii in mk_idx[mm] ]
 
@@ -719,18 +724,18 @@ def get_markers(awd_dat,log_fn=[]):
       log_dat,kw_dat,comments = read_log(log_fn,awd_dat)
       # all the log markers are 'right', if there's an M marker nearby, then use it for accuracy,and remove from the working list
       # if not, use the log
-      th = 10  # use a more generous window?
-    
-      for ii,ll in enumerate(log_dat['idx']):
-         ll = np.abs(ll)
-         match_idx_M,loc_idx = find_nearest(wM_idx,ll)
-         #print(match_idx_M,ll)
-         if np.abs(match_idx_M-ll) < th:
-            #print(loc_idx)
-            keep_idx.append(match_idx_M)
-            del(wM_idx[loc_idx])   # remove it from the working M_idx list for below
-         else:
-            keep_idx.append(ll)
+      if len(wM_idx)>0:
+          th = 10  # use a more generous window?
+          for ii,ll in enumerate(log_dat['idx']):
+             ll = np.abs(ll)
+             match_idx_M,loc_idx = find_nearest(wM_idx,ll)
+             #print(match_idx_M,ll)
+             if np.abs(match_idx_M-ll) < th:
+                #print(loc_idx)
+                keep_idx.append(match_idx_M)
+                del(wM_idx[loc_idx])   # remove it from the working M_idx list for below
+             else:
+                keep_idx.append(ll)
    else:
        log_dat = {}
        comments = []
