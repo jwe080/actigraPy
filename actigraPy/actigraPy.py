@@ -115,7 +115,7 @@ def read_log(fn,awd_dat={}):
     elif fn_ext == '.xls':
         log_dat = pd.read_excel(fn)
 
-    print(log_dat)
+    #print(log_dat)
 
     # check for comment column and extract the rows that have the keywords
     # this will fail miserably if there is no Comment column...
