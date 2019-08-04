@@ -404,6 +404,7 @@ def plot_awd(awd_dat,mk_idx,plot_type='single',comments=[],show=True,fn_pref='',
    #for dd,day in enumerate(days[28:35]):
    for dd,day in enumerate(days):
       print(day)
+      offset=0
       #ax = awd_fig.add_subplot(n_days,1,dd+1)
       ax = awd_fig.add_subplot(n_days,1,dd+1)
       # get data that matches (you really only have to do this for the first day (and last sort of) because it should be 1440 rows per full day
@@ -423,9 +424,14 @@ def plot_awd(awd_dat,mk_idx,plot_type='single',comments=[],show=True,fn_pref='',
       
       if debug:
         print(min_idx,max_idx)
+        
+          #tmp = idat[dd_idx] 
+      if dd == 0:
+          offset = 1439-max_idx
+          delt_idx = 1439
 
       #tmp = idat[dd_idx]
-      plt.bar(np.arange(delt_idx),idat[min_idx:max_idx],width=1)
+      plt.bar(np.arange(offset,delt_idx),idat[min_idx:max_idx],width=1)
 
       colours = ['blue','red','darkred','pink','lightcyan']
       for cc,mm in enumerate(mk_idx.keys()):
@@ -482,7 +488,7 @@ def plot_awd(awd_dat,mk_idx,plot_type='single',comments=[],show=True,fn_pref='',
          if len(c_idx[0]) >0:
             for ii,cc in enumerate(c_idx[0]):
                jitter = (ii % 2) * comment_height // 4
-               ax.text(np.abs(com_idx[cc])-min_idx,comment_height+jitter,com_txt[cc])
+               ax.text(np.abs(com_idx[cc])-min_idx+offset,comment_height+jitter,com_txt[cc])
                # if comment types are needed...
                #jitter = (ii % 2)*50
                #if com_type[cc] == 'CC':
@@ -588,6 +594,12 @@ def read_AWD(fn):
 
 def write_Mtimes(awd_dat,mk_idx,fn_pref,comments=[]):
    dt_fmt = "%d-%b-%y %I:%M %p"
+
+   zipped_pairs = zip(comments[0].tolist(),comments[1])
+   z = [x for _, x in sorted(zipped_pairs)]
+   comments[1] = z
+   comments[0] = np.sort(comments[0])
+
 
    # need to build a list of marker idxs and types, then go through the checks below.
    # but markers may be off by a minute.. (fixed - I think)
