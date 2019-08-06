@@ -591,15 +591,77 @@ def read_AWD(fn):
 
    return awd_dat
 
+def write_Mtimes_new(awd_dat,mk_idx,fn_pref,mc_dict={},fn_suff=""):
+    dt_fmt = "%d-%b-%y %I:%M %p"
+    all_dt_txt = []
 
+    for mm in mk_idx.keys():
+        # convert indices to time
+        mm_dt = [ awd_dat['dt_list'][ii] for ii in mk_idx[mm] ]
+    
+        # convert the times to string
+        mm_dt_tmp = [ ii.strftime(dt_fmt) for ii in mm_dt ]
+    
+        n = round(len(mm_dt_tmp)/2)
+        # make 'off' and 'on' columns
+        mm_dt_txt = pd.DataFrame(list(zip(mm_dt_tmp[::2],mm_dt_tmp[1::2],[mm]*n)), columns =['Off', 'On','marker'])
+        for ii in ['On','Off']:
+            tmp = mm_dt_txt[ii].str.split(" ", n = 1, expand = True)
+            mm_dt_txt[ ii + 'Date'] = tmp[0]
+            mm_dt_txt[ ii + 'Time'] = tmp[1]
+        
+        if mm in mc_dict.keys():
+            #account for missing comments
+            for ii,idx in enumerate(mk_idx[mm]):
+                if ii % 2 == 0:
+                    if not idx in mc_dict[mm]['idxs']:
+                        mc_dict[mm]['idxs'].insert(int(ii/2),idx)
+                        mc_dict[mm]['comments'].insert(int(ii/2),"")
+            comments = mc_dict[mm]['comments']
+        else:
+            comments = [""]*len(mm_dt_txt)
+        
+        mm_dt_txt['Comment']=comments    
+        all_dt_txt.append(mm_dt_txt)
+
+        all_dt = pd.concat(all_dt_txt,join='outer',axis=0,sort=False)
+        all_dt['OffTime'] = pd.to_datetime(all_dt.OffTime)
+        all_dt['OffDate_dt'] = pd.to_datetime(all_dt['OffDate'])
+        all_dt.sort_values(by=['OffDate_dt','OffTime','marker'],ascending=True,inplace=True)
+        del all_dt['OffDate_dt']
+        all_dt['OffTime'] = all_dt.OffTime.dt.strftime(dt_fmt[9:])
+        
+        all_dt = all_dt[['OffDate','OffTime','OnDate','OnTime','marker','Comment']]
+        all_dt.to_csv(fn_pref + '_Mtimes' + fn_suff + '.csv', sep=',',index=False)
+
+        return all_dt
+    
+def read_Mtimes(fn,awd_dat):
+    Mtimes = pd.read_csv(fn)
+    Mtimes['Off_dt'] = [dt.datetime.strptime(x,'%d-%b-%y %I:%M %p') for x in Mtimes['OffDate']+" "+Mtimes['OffTime']]
+    Mtimes['On_dt'] = [dt.datetime.strptime(x,'%d-%b-%y %I:%M %p') for x in Mtimes['OnDate']+" "+Mtimes['OnTime']]
+
+    umks = np.unique(Mtimes['marker'])
+    mk_idx={}
+    mc_dict={}
+    for mm in umks:
+        print(mm)
+        c_dict = {}
+        tmp = Mtimes['Off_dt'][Mtimes['marker']==mm].tolist()
+        tmp.extend(Mtimes['On_dt'][Mtimes['marker']==mm].tolist())
+        tmp.sort()
+        mk_idx[mm] = [np.where(np.asarray(awd_dat['dt_list'])==x)[0][0] for x in tmp]
+    
+    
+        if len((Mtimes['Comment'][Mtimes['marker']==mm]).dropna()) > 0:
+            c_dict['comments']=Mtimes['Comment'].loc[(Mtimes['Comment'][Mtimes['marker']==mm]).dropna().index].tolist()
+            tmp = Mtimes['Off_dt'].loc[(Mtimes['Comment'][Mtimes['marker']==mm]).dropna().index].tolist()
+            c_dict['idxs']=[np.where(np.asarray(awd_dat['dt_list'])==x)[0].tolist()[0] for x in tmp]
+            mc_dict[mm]=c_dict
+    return mk_idx,mc_dict
+    
 def write_Mtimes(awd_dat,mk_idx,fn_pref,comments=[]):
    dt_fmt = "%d-%b-%y %I:%M %p"
-
-   zipped_pairs = zip(comments[0].tolist(),comments[1])
-   z = [x for _, x in sorted(zipped_pairs)]
-   comments[1] = z
-   comments[0] = np.sort(comments[0])
-
 
    # need to build a list of marker idxs and types, then go through the checks below.
    # but markers may be off by a minute.. (fixed - I think)
