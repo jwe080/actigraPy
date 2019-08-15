@@ -58,56 +58,35 @@ def get_idx(dat_time,mk_times,pos=False):
     """
     from a data file with times and marker times in the same format, return indices for all the markers
     """
- 
+    
     dat_time = list(dat_time)
-
-    tmp = []
-    exist = []
-    for ii in mk_times:
-        try:
-            tmp.append(dat_time.index(ii))  
-            exist.append(True)
-        except:
-            exist.append(False)
-            print('warning: missing index ' + str(ii))
-            pass   # this happens if the data was clipped...
-
-    mk_idx = np.array(tmp)
-
+    mk_idx = []
+    exist_list = []
+    for block in mk_times:
+        tmp = ()
+        exist = ()
+        for time in block[0:2]:
+            try:
+                tmp = tmp+(dat_time.index(time),)
+                exist=exist+(True,)
+            except:
+                if time<dat_time[0]:
+                    tmp=tmp+(0,)
+                elif time>dat_time[-1]:
+                    tmp=tmp+(len(dat_time)-1,)
+                exist=exist+(False,)
+        tmp = tmp+(block[2],)
+        exist_list.append(exist)
+        mk_idx.append(tmp)
+    
     if pos:
-       return mk_idx,exist
+        return mk_idx,exist_list
     else:
-       return mk_idx
-
-def read_marker(fn,awd_dat):
-    '''This shouldn't be needed anymore... 
-    '''
- 
-    Mtimes = pd.read_csv(fn,header=None, keep_default_na=False)
-
-    # get the idx from the Mtimes file
-    mks = Mtimes.iloc[:,-2]
-    #mks = [ ii[-1] for ii in Mtimes ]
-    umks = np.unique(mks)
-    #print(umks)
-
-    #M_time = np.array([ ','.join(ii[0:1]) for ii in Mtimes ] )
-    mk_idx = {}
-    for mm in umks:
-        if mm != 'c' and mm != 'C':
-           tmp = Mtimes[0][Mtimes[1].isin([mm])]
-           tmp = get_idx(awd_dat['DateTime'],tmp)
-           mk_idx[mm] = tmp
-
-    # for fixed comments
-    comments = Mtimes[Mtimes[1].isin(['C'])]
-
-    return Mtimes, mk_idx, comments
+        return mk_idx
     
 def read_log(fn,awd_dat={}):
 
     dt_fmt = '%d-%b-%y %I:%M %p'
-    comment_mk = ['c','C']
 
     fn_pref,fn_ext = os.path.splitext(fn)
     if fn_ext == '.csv':
@@ -133,7 +112,7 @@ def read_log(fn,awd_dat={}):
     log_dat['Off'] = pd.to_datetime(log_dat['OffDate'].astype(str) + 
                                     ' ' + log_dat['OffTime'].astype(str) )
     #log_dat.drop(['OnDate','OnTime','OffDate','OffTime'],inplace=True)
-
+    log_dat['Comment']=log_dat['Comment'].fillna("")
     log_dat = log_dat.to_dict(orient='list')    
 
 
@@ -164,45 +143,34 @@ def read_log(fn,awd_dat={}):
     if 'marker' in log_dat.keys():
         um = np.unique(log_dat['marker'])
         # check for comment markers remove from list
-        c_mk = [ cc for cc in comment_mk if cc in um ]
-        um_not_c = [ ii for ii in um if ii not in comment_mk ] 
         mk_dict = {}
-        for mm in um_not_c:
+        for mm in um:
              mm_log_idx = np.where(np.array(log_dat['marker']) == mm)[0]
-             mm_time = [ val for pair in zip(st_time[mm_log_idx], en_time[mm_log_idx]) for val in pair]
+             x = st_time[mm_log_idx]
+             y = en_time[mm_log_idx]
+             z = np.array(log_dat['Comment'])[mm_log_idx]
+             mm_time = list(zip(y,x,z))
              mm_idx, pos =  get_idx(awd_dat['DateTime'],mm_time,pos=True)
-             mk_dict[mm] = mm_idx
+             for idx in range(0,len(mm_idx)):
+                 if pos[idx]==(False,False):
+                      mm_idx.pop(idx)
+             mk_dict[mm]=mm_idx
         log_dat['mks'] = mk_dict 
         #log_dat['idx'] =  mk_idx
         log_dat['idx'] =  []
-
-        # deal with comments b/c there might be blanks
-        # if there are markers can use c index...  make list if more than c comments...
-        com = []
-        com_idx = []
-        if len(c_mk) > 0:
-            for cc in c_mk:
-                cc_log_idx = np.where(np.array(log_dat['marker']) == cc)[0]
-                cc_idx, pos =  get_idx(awd_dat['DateTime'],st_time[cc_log_idx],pos=True)
-                com = com + list(np.array(log_dat['Comment'])[cc_log_idx])
-                indices = [i for i, x in enumerate[pos] if pos ==True]
-                add_com = list(np.array(log_dat['Comment'])[cc_log_idx])
-                for y in indices:
-                    com.append(add_com[y])
-                #com_idx = com_idx + list(mk_idx[cc_log_idx])
-                com_idx.extend(cc_idx)
-            comments = [com_idx, com]   # for compatibility but should be changed...    
-        else:
-            comments = []
+        
     else:
-        mk_time = [ val for pair in zip(st_time, en_time) for val in pair]
-        mk_idx, pos =  get_idx(awd_dat['DateTime'],mk_time,pos=True)
-        log_dat['idx'] =  mk_idx
-        log_dat['mks'] = {}
-        comments = [ log_dat['idx'][::2],list(np.array(log_dat['Comment'])[pos[::2]])]
+        mk_list = list(zip(st_time,en_time,np.array(log_dat['Comment'])))
+        #mk_idx, pos =  get_idx(awd_dat['DateTime'],mk_time,pos=True)
+        mk_idx,pos=get_idx(awd_dat['DateTime'],mk_list,pos=True)
+        #adjust for comment blocks that are totally out of range of AWD
+        for idx in range(0,len(mk_idx)):
+            if pos[idx]==(False,False):
+                mk_idx.pop(idx)
 
+        log_dat['idx']=mk_idx
 
-    return log_dat,kw_dat,comments
+    return log_dat,kw_dat
 
 def write_edited(fn_pref,dat=[],hdr=[],mk_idx=[]):
 
@@ -248,19 +216,10 @@ def write_dat(awd_dat,mk_idx,fn_pref,fn_suff=''):
 
    # make marker dicts into full length series
    for mm in mk_idx.keys():
-      #print(mm)
-      tmp = mk_idx[mm]
-      #print(tmp)
-      tmp_tup = [ ii for ii in zip(tmp[::2],tmp[1::2]) ]
-      tmp_tup.sort(key=lambda tup: tup[0])
-      tmp = [ jj for ii in tmp_tup for jj in ii]
-      #print(tmp)
-      #tmp = np.sort(mk_idx[mm])
       mm_marks = [0] * len(dat)
-      #for ii in mk_idx[mm]: mm_marks[ii]=mm
-      for ii,idx2 in enumerate(tmp[1::2]):
-         idx1 = mk_idx[mm][2*ii]
-         #print(idx1,idx2)
+      for block in mk_idx[mm]:
+         idx1 = block[0]
+         idx2= block[1]
          mm_marks[idx1:idx2]= [1]*(idx2-idx1)
       
       #print(mm_marks)
@@ -333,8 +292,8 @@ def clip_dat(lim,awd_dat):
    dat = { ii: awd_dat[ii] for ii in ['DateTime','activity', 'dt_list','M'] }
    dat = pd.DataFrame.from_dict(dat)
 
-   [st,en] = get_idx(awd_dat['DateTime'],lim)
-
+   tmp = get_idx(awd_dat['DateTime'],lim)
+   [st,en]=[tmp[0][0],tmp[0][1]]
    clipped_dat =  dat.iloc[st:en,:]
    clipped_dat = clipped_dat.to_dict(orient='list')
 
@@ -371,7 +330,7 @@ def despike(dat,zlev=4,win=2):
  
    return nap
 
-def plot_awd(awd_dat,mk_idx,plot_type='single',comments=[],show=True,fn_pref='',max_act=-1,debug=False):
+def plot_awd(awd_dat,mk_idx,plot_type='single',show=True,fn_pref='',max_act=-1,debug=False):
 #def plot_awd(DateTime,idat,list_idx,plot_type='single',comments=[],show=True,fn_pref='',max_act=-1,debug=False):
    idat = awd_dat['activity']
 
@@ -408,7 +367,11 @@ def plot_awd(awd_dat,mk_idx,plot_type='single',comments=[],show=True,fn_pref='',
       ax = awd_fig.add_subplot(n_days,1,dd+1)
       # get data that matches (you really only have to do this for the first day (and last sort of) because it should be 1440 rows per full day
       dd_idx = [idx for idx,ddd  in enumerate(day_list) if ddd == day]
-      
+      if max_act > 0:
+         ax.set_ylim([0,max_act])
+         comment_height = max_act/2
+      else:
+         comment_height = 250
       min_idx = np.min(dd_idx)
 
       max_idx = np.max(dd_idx)
@@ -418,82 +381,47 @@ def plot_awd(awd_dat,mk_idx,plot_type='single',comments=[],show=True,fn_pref='',
             max_idx = max_idx + 1440
          else:
             max_idx = len(idat)
+      offset =0
+      delt_idx = max_idx-min_idx # this should just be the number of days plotted in a row...
 
-      delt_idx = max_idx-min_idx  # this should just be the number of days plotted in a row...
+      if dd==0:
+          offset = 1439-max_idx
+          delt_idx = 1439
+   
       
       if debug:
         print(min_idx,max_idx)
 
       #tmp = idat[dd_idx]
-      plt.bar(np.arange(delt_idx),idat[min_idx:max_idx],width=1)
-
+      plt.bar(np.arange(offset,delt_idx),idat[min_idx:max_idx],width=1)
+     
       colours = ['blue','red','darkred','pink','lightcyan']
       for cc,mm in enumerate(mk_idx.keys()):
-         p_idx = np.array(mk_idx[mm])
-         n_p = len(p_idx)
-         p_idx = p_idx * ( round(n_p/2)*[-1,1] )
-         m_idx = np.logical_and(np.abs(p_idx)<=max_idx,np.abs(p_idx)>=min_idx)
-         tmp =  list(p_idx[m_idx])
-         if debug:
-            print('input',cc,tmp)
-         if len(tmp) > 0:
-            if np.mod(len(tmp),2) > 0 :  # there's an unpaired marker
-                if tmp[0] > 0:
-                    tmp.insert(0,min_idx*-1)
-                else:
-                    tmp.append(max_idx)
-            elif tmp[0] > 0:
-                tmp.insert(0,min_idx*-1)
-                tmp.append(max_idx)
-            if debug:
-               print('plot this',tmp)
-            #tmp2 = tmp[-1]
-            #if cc>0:
-            #   if tmp2 <= max_idx-1:
-            #      tmp.append(np.sign(tmp2)*-1*(np.abs(tmp2+1)))
-            #      tmp.append(max_idx*np.sign(tmp2))
-            if tmp[0]<=0:
-               tmp_s = tmp[::2]
-               tmp_e = tmp[1::2]
-            else:
-               tmp_s = tmp[1::2]
-               tmp_e = tmp[2::2]
-               
-            tmp = zip(tmp_s,tmp_e)
-            for ii in tmp:
-               ax.axvspan(np.abs(ii[0])-min_idx+offset,np.abs(ii[1])-min_idx +offset, alpha=0.3, color=colours[np.mod(cc,len(colours))])
+          mk_dd_idx= np.where([(x[1]>min_idx)&(x[0]<max_idx) for x in mk_idx[mm]])[0].tolist()
+          mk_dd = []
+          for idx in mk_dd_idx:
+              tup = mk_idx[mm][idx]
+              [st,en]=[tup[0],tup[1]]
+              if tup[0]<min_idx:
+                  st=min_idx
+              if tup[1]>max_idx:
+                  en=max_idx
+              tmp=(st,en,tup[2])
+              mk_dd.append(tmp)
+          for idx,ii in enumerate(mk_dd):
+              x1=np.abs(ii[0])-min_idx+offset
+              x2=np.abs(ii[1])-min_idx +offset
+              print("plotting: %d,%d from %s"%(x1,x2,mm))
+              ax.axvspan(x1,x2, alpha=0.3, color=colours[np.mod(cc,len(colours))])
+              jitter = (cc % 2) * comment_height // 4
+              ax.text(x1,comment_height+jitter,ii[2])
+
             #for mm in M_idx[m_idx]:
             #   ax.text(mm-min_idx,idat[mm],'M')
                #print(mm)
 
-      if max_act > 0:
-         ax.set_ylim([0,max_act])
-         comment_height = max_act/2
-      else:
-         comment_height = 250
-
-      if len(comments)>0:
-         com_idx = np.array(comments[0])
-         com_txt = np.array(comments[1])
-         #com_type = np.array(comments[2])
-         c_idx = np.where(np.logical_and(np.abs(com_idx)<=max_idx,np.abs(com_idx)>=min_idx))
-         if debug:
-            print(c_idx[0])
-         if len(c_idx[0]) >0:
-            for ii,cc in enumerate(c_idx[0]):
-               jitter = (ii % 2) * comment_height // 4
-               ax.text(np.abs(com_idx[cc])-min_idx,comment_height+jitter,com_txt[cc])
-               # if comment types are needed...
-               #jitter = (ii % 2)*50
-               #if com_type[cc] == 'CC':
-               #   ax.text(np.abs(com_idx[cc])-min_idx,350+jitter,com_txt[cc],color='blue')
-               #elif com_type[cc] == 'C':      
-               #   ax.text(np.abs(com_idx[cc])-min_idx,150+jitter,com_txt[cc],color='purple')
-               #else:
-               #   ax.text(np.abs(com_idx[cc])-min_idx,250+jitter,com_txt[cc])
-
       ax.set_ylabel(day)
-      ax.set_xticks(np.arange(0,delt_idx,60))
+      ax.set_xticks(np.arange(0,1439,60))
       if plot_type=='double':
          ax.set_xticklabels(list(np.arange(24))*2)
       else:
@@ -586,58 +514,33 @@ def read_AWD(fn):
    return awd_dat
 
 
-def write_Mtimes(awd_dat,mk_idx,fn_pref,comments=[]):
+def write_Mtimes(awd_dat,mk_idx,fn_pref):
    dt_fmt = "%d-%b-%y %I:%M %p"
+   mk_list = []
 
-   # need to build a list of marker idxs and types, then go through the checks below.
-   # but markers may be off by a minute.. (fixed - I think)
-   all_dt_txt = []
-   #clumsy fix -- find a better way?
-   if 'M' in mk_idx.keys():    
-       if len(mk_idx['M']) == 0:
-           del mk_idx['M']
-           del mk_idx['m']
    for mm in mk_idx.keys():
-      print(mm)
-      # convert indices to time
-      mm_dt = [ awd_dat['dt_list'][ii] for ii in mk_idx[mm] ]
+       if mm != 'M':
+            for tup in mk_idx[mm]:
+                mk_list.append(tup+(mm,))
+   mk_list.sort()
+   dat = pd.DataFrame()
 
-      # convert the times to string
-      mm_dt_tmp = [ ii.strftime(dt_fmt) for ii in mm_dt ]
+   dat['On'] = [awd_dat['dt_list'][x[0]].strftime(dt_fmt) for x in mk_list]
+   dat['Off'] = [awd_dat['dt_list'][x[1]].strftime(dt_fmt) for x in mk_list]
 
-      n = round(len(mm_dt_tmp)/2)
-      # make 'off' and 'on' columns
-      mm_dt_txt = pd.DataFrame(list(zip(mm_dt_tmp[::2],mm_dt_tmp[1::2],[mm]*n)), columns =['Off', 'On','marker'])
-      
-      for ii in ['On','Off']:
-         tmp = mm_dt_txt[ii].str.split(" ", n = 1, expand = True)
-         mm_dt_txt[ ii + 'Date'] = tmp[0]
-         mm_dt_txt[ ii + 'Time'] = tmp[1]
-      all_dt_txt.append(mm_dt_txt)
 
-   if comments:
+   for ii in ['On','Off']:
+       tmp = dat[ii].str.split(" ", n = 1, expand = True)
+       dat[ii + 'Date'] = tmp[0]
+       dat[ ii + 'Time'] = tmp[1]
+   del dat['On']
+   del dat['Off']
 
-      C_dt_tmp =  [ awd_dat['dt_list'][val].strftime(dt_fmt) for ii,val in enumerate(comments[0])]
-      C_dt_txt = pd.DataFrame(list(zip(C_dt_tmp,['c']*len(comments[1]),comments[1])),columns=['Off','marker','Comment'])
-      #C_dt_txt = pd.DataFrame(list(zip(C_dt_tmp,comments[2],comments[1])),columns=['Off','marker','Comment'])
-      tmp = mm_dt_txt[ii].str.split(" ", n = 1, expand = True)
-      C_dt_txt[ 'OffDate'] = tmp[0]
-      C_dt_txt[ 'OffTime'] = tmp[1]
-      C_dt_txt[ 'OnDate'] = tmp[0]
-      C_dt_txt[ 'OnTime'] = tmp[1]
-      all_dt_txt.append(C_dt_txt)
+   dat['marker'] = [x[3] for x in mk_list]
+   dat['Comment'] = [x[2] for x in mk_list]
+   dat.to_csv(fn_pref + '_Mtimes.csv', sep=',',index=False)
 
-   all_dt = pd.concat(all_dt_txt,join='outer',axis=0,sort=False)
-   all_dt['OffTime'] = pd.to_datetime(all_dt.OffTime)
-   all_dt.sort_values(by=['OffDate','OffTime','marker'],ascending=True,inplace=True)
-   all_dt['OffTime'] = all_dt.OffTime.dt.strftime(dt_fmt[9:])
-
-   all_dt = all_dt[['OffDate','OffTime','OnDate','OnTime','marker','Comment']]
-   
-   all_dt.to_csv(fn_pref + '_Mtimes.csv', sep=',',index=False)
-
-   return all_dt
-
+   return dat
 def get_markers(awd_dat,log_fn=[]):
  
    N = awd_dat['N']
@@ -719,14 +622,14 @@ def get_markers(awd_dat,log_fn=[]):
    # if there is a log file put in the markers and assume they are correct...
    wM_idx = deepcopy(M_idx)
    keep_idx = []
-   log_com = []
    if os.path.isfile(log_fn):
-      log_dat,kw_dat,comments = read_log(log_fn,awd_dat)
+      log_dat,kw_dat = read_log(log_fn,awd_dat)
+      mk_idx=[y for z in [x[0:2] for x in log_dat['idx']] for y in z]
       # all the log markers are 'right', if there's an M marker nearby, then use it for accuracy,and remove from the working list
       # if not, use the log
       if len(wM_idx)>0:
           th = 10  # use a more generous window?
-          for ii,ll in enumerate(log_dat['idx']):
+          for ii,ll in enumerate(mk_idx):
              ll = np.abs(ll)
              match_idx_M,loc_idx = find_nearest(wM_idx,ll)
              #print(match_idx_M,ll)
@@ -738,9 +641,6 @@ def get_markers(awd_dat,log_fn=[]):
                 keep_idx.append(ll)
    else:
        log_dat = {}
-       comments = []
-
-   len_Msegs = np.diff(keep_idx)
    # modify the mask to inlcude the marked segments
    #xM = [ [1]*len_Msegs[ii] if val else [0]*len_Msegs[ii] for ii,val in enumerate(keep_idx) ]
    #maskM = [ jj for ii in xM for jj in ii]
@@ -819,19 +719,18 @@ def get_markers(awd_dat,log_fn=[]):
 
    # keep segs in longs (t) and also non-act (t)
    keep = longs[:len(nact_segs)]*nact_segs
-
    z_segs = [ new_seg_idx[ii] for ii,val in enumerate(keep) if val ]
-   z_idx = [ int(ii)  for jj in z_segs for ii in jj]
+   #z_idx = [ int(ii)  for jj in z_segs for ii in jj]
 
    out_idx = {}
-   out_idx ['M'] = np.array(M_idx)
-   out_idx['z'] = np.array(z_idx)
-   out_idx['m'] = np.array(keep_idx)
-   if log_dat:
-      out_idx['l'] = np.sort(np.array(log_dat['idx']))  # sometimes they're not in order?
+   M_list = list(zip(M_idx[0::2], M_idx[1::2]))
+   out_idx ['M'] = [(x[0],x[1],"") for x in M_list] #talk to Jen about this -- pretty clumsy
+   out_idx['z'] = [(int(x[0]),int(x[1]),"") for x in z_segs]
+   out_idx['m'] = [(int(x[0]),int(x[1]),"") for x in sort_tmp]
+   #if log_dat:
+      #out_idx['l'] = np.sort(np.array(log_dat['idx']))  # sometimes they're not in order?
  
-   return out_idx,comments
-
+   return out_idx
 
 if __name__ == "__main__":
    
