@@ -152,12 +152,12 @@ def read_log(fn,awd_dat={}):
              mm_time = list(zip(y,x,z))
              mm_idx, pos =  get_idx(awd_dat['DateTime'],mm_time,pos=True)
              rm_list=[]
-	     for idx,tup in enumerate(pos):
-		 if tup == (False,False)
+             for idx,tup in enumerate(pos):
+                 if tup == (False,False):
                       rm_list.append(idx)
              rm_list.sort(reverse=True)
              for idx in rm_list:
-                 mm_list.pop(idx)
+                 mm_idx.pop(idx)
              mk_dict[mm]=mm_idx
         log_dat['mks'] = mk_dict 
         #log_dat['idx'] =  mk_idx
