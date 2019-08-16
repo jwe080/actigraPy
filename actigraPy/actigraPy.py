@@ -367,11 +367,11 @@ def plot_awd(awd_dat,mk_idx,plot_type='single',show=True,fn_pref='',max_act=-1,d
       ax = awd_fig.add_subplot(n_days,1,dd+1)
       # get data that matches (you really only have to do this for the first day (and last sort of) because it should be 1440 rows per full day
       dd_idx = [idx for idx,ddd  in enumerate(day_list) if ddd == day]
-      if max_act > 0:
-         ax.set_ylim([0,max_act])
-         comment_height = max_act/2
-      else:
-         comment_height = 250
+      if not max_act > 0:
+         max_act = max(awd_dat['activity'])
+      ax.set_ylim([0,max_act])
+      comment_height = max_act/2
+
       min_idx = np.min(dd_idx)
 
       max_idx = np.max(dd_idx)
