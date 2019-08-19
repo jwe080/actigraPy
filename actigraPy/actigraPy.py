@@ -168,9 +168,13 @@ def read_log(fn,awd_dat={}):
         #mk_idx, pos =  get_idx(awd_dat['DateTime'],mk_time,pos=True)
         mk_idx,pos=get_idx(awd_dat['DateTime'],mk_list,pos=True)
         #adjust for comment blocks that are totally out of range of AWD
+        rm_list=[]
         for idx in range(0,len(mk_idx)):
             if pos[idx]==(False,False):
-                mk_idx.pop(idx)
+                rm_list.append(idx)
+        rm_list.sort(reverse=True)
+        for idx in rm_list:
+            mk_idx.pop(idx)
 
         log_dat['idx']=mk_idx
 
