@@ -149,7 +149,7 @@ def read_log(fn,awd_dat={}):
              x = st_time[mm_log_idx]
              y = en_time[mm_log_idx]
              z = np.array(log_dat['Comment'])[mm_log_idx]
-             mm_time = list(zip(y,x,z))
+             mm_time = list(zip(x,y,z))
              mm_idx, pos =  get_idx(awd_dat['DateTime'],mm_time,pos=True)
              rm_list=[]
              for idx,tup in enumerate(pos):
@@ -533,8 +533,8 @@ def write_Mtimes(awd_dat,mk_idx,fn_pref):
    mk_list.sort()
    dat = pd.DataFrame()
 
-   dat['On'] = [awd_dat['dt_list'][x[0]].strftime(dt_fmt) for x in mk_list]
-   dat['Off'] = [awd_dat['dt_list'][x[1]].strftime(dt_fmt) for x in mk_list]
+   dat['Off'] = [awd_dat['dt_list'][x[0]].strftime(dt_fmt) for x in mk_list]
+   dat['On'] = [awd_dat['dt_list'][x[1]].strftime(dt_fmt) for x in mk_list]
 
 
    for ii in ['On','Off']:
