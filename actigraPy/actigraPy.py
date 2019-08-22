@@ -522,7 +522,7 @@ def read_AWD(fn):
    return awd_dat
 
 
-def write_Mtimes(awd_dat,mk_idx,fn_pref):
+def write_Mtimes(awd_dat,mk_idx,fn_pref,fn_suff=''):
    dt_fmt = "%d-%b-%y %I:%M %p"
    mk_list = []
 
@@ -546,7 +546,7 @@ def write_Mtimes(awd_dat,mk_idx,fn_pref):
 
    dat['marker'] = [x[3] for x in mk_list]
    dat['Comment'] = [x[2] for x in mk_list]
-   dat.to_csv(fn_pref + '_Mtimes.csv', sep=',',index=False)
+   dat.to_csv(fn_pref + '_Mtimes'+fn_suff+'.csv', sep=',',index=False)
 
    return dat
 def get_markers(awd_dat,log_fn=[]):
