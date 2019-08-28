@@ -149,11 +149,15 @@ def read_log(fn,awd_dat={}):
              x = st_time[mm_log_idx]
              y = en_time[mm_log_idx]
              z = np.array(log_dat['Comment'])[mm_log_idx]
-             mm_time = list(zip(y,x,z))
+             mm_time = list(zip(x,y,z))
              mm_idx, pos =  get_idx(awd_dat['DateTime'],mm_time,pos=True)
-             for idx in range(0,len(mm_idx)):
-                 if pos[idx]==(False,False):
-                      mm_idx.pop(idx)
+             rm_list=[]
+             for idx,tup in enumerate(pos):
+                 if tup == (False,False):
+                      rm_list.append(idx)
+             rm_list.sort(reverse=True)
+             for idx in rm_list:
+                 mm_idx.pop(idx)
              mk_dict[mm]=mm_idx
         log_dat['mks'] = mk_dict 
         #log_dat['idx'] =  mk_idx
@@ -164,9 +168,13 @@ def read_log(fn,awd_dat={}):
         #mk_idx, pos =  get_idx(awd_dat['DateTime'],mk_time,pos=True)
         mk_idx,pos=get_idx(awd_dat['DateTime'],mk_list,pos=True)
         #adjust for comment blocks that are totally out of range of AWD
+        rm_list=[]
         for idx in range(0,len(mk_idx)):
             if pos[idx]==(False,False):
-                mk_idx.pop(idx)
+                rm_list.append(idx)
+        rm_list.sort(reverse=True)
+        for idx in rm_list:
+            mk_idx.pop(idx)
 
         log_dat['idx']=mk_idx
 
@@ -367,11 +375,11 @@ def plot_awd(awd_dat,mk_idx,plot_type='single',show=True,fn_pref='',max_act=-1,d
       ax = awd_fig.add_subplot(n_days,1,dd+1)
       # get data that matches (you really only have to do this for the first day (and last sort of) because it should be 1440 rows per full day
       dd_idx = [idx for idx,ddd  in enumerate(day_list) if ddd == day]
-      if max_act > 0:
-         ax.set_ylim([0,max_act])
-         comment_height = max_act/2
-      else:
-         comment_height = 250
+      if not max_act > 0:
+         max_act = max(awd_dat['activity'])
+      ax.set_ylim([0,max_act])
+      comment_height = max_act/2
+
       min_idx = np.min(dd_idx)
 
       max_idx = np.max(dd_idx)
@@ -514,7 +522,7 @@ def read_AWD(fn):
    return awd_dat
 
 
-def write_Mtimes(awd_dat,mk_idx,fn_pref):
+def write_Mtimes(awd_dat,mk_idx,fn_pref,fn_suff=''):
    dt_fmt = "%d-%b-%y %I:%M %p"
    mk_list = []
 
@@ -525,8 +533,8 @@ def write_Mtimes(awd_dat,mk_idx,fn_pref):
    mk_list.sort()
    dat = pd.DataFrame()
 
-   dat['On'] = [awd_dat['dt_list'][x[0]].strftime(dt_fmt) for x in mk_list]
-   dat['Off'] = [awd_dat['dt_list'][x[1]].strftime(dt_fmt) for x in mk_list]
+   dat['Off'] = [awd_dat['dt_list'][x[0]].strftime(dt_fmt) for x in mk_list]
+   dat['On'] = [awd_dat['dt_list'][x[1]].strftime(dt_fmt) for x in mk_list]
 
 
    for ii in ['On','Off']:
@@ -538,7 +546,7 @@ def write_Mtimes(awd_dat,mk_idx,fn_pref):
 
    dat['marker'] = [x[3] for x in mk_list]
    dat['Comment'] = [x[2] for x in mk_list]
-   dat.to_csv(fn_pref + '_Mtimes.csv', sep=',',index=False)
+   dat.to_csv(fn_pref + '_Mtimes'+fn_suff+'.csv', sep=',',index=False)
 
    return dat
 def get_markers(awd_dat,log_fn=[]):
