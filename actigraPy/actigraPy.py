@@ -25,7 +25,7 @@ import matplotlib.backends.tkagg as tkagg
 """
 maybe make a global var for dat?
 """
-
+dt_fmt = '%d-%b-%y %I:%M %p'
 
 def read_dat(fn_pref):
     """
@@ -60,25 +60,35 @@ def get_idx(dat_time,mk_times,pos=False):
     """
     
     dat_time = list(dat_time)
-    mk_idx = []
-    exist_list = []
-    for block in mk_times:
-        tmp = ()
-        exist = ()
-        for time in block[0:2]:
-            try:
-                tmp = tmp+(dat_time.index(time),)
-                exist=exist+(True,)
-            except:
-                if time<dat_time[0]:
-                    tmp=tmp+(0,)
-                elif time>dat_time[-1]:
-                    tmp=tmp+(len(dat_time)-1,)
-                exist=exist+(False,)
-        tmp = tmp+(block[2],)
-        exist_list.append(exist)
-        mk_idx.append(tmp)
-    
+    if isinstance(dat_time[0],str):
+        dt_time = [ dt.datetime.strptime(ii,dt_fmt) for ii in dat_time ]
+        str_time = dat_time
+    else:
+        dt_time = dat_time
+        str_time = [ dt.datetime.strftime(ii,dt_fmt) for ii in dat_time ]
+    mk_len = len(mk_times)
+    # initialize the mk_idx with only comments
+    mk_idx = [[None,None,ii[2]] for ii in mk_times]
+    exist_list = [[False,False]]*mk_len
+    for idx,(st,en,com) in enumerate(mk_times):
+        # check start that the st,en times are within range and get index, otherwise
+        # put the min, max of the range, respectively
+        for time_idx,time in enumerate([st,en]):
+            if isinstance(time,str):
+               time = dt.datetime.strptime(time,dt_fmt)
+            ok = True
+            if time  < dt_time[0]:
+               mk_idx[idx][time_idx] = 0
+               ok = False
+            if time  > dt_time[-1]:
+               mk_idx[idx][time_idx] = len(dat_time)-1
+               ok = False
+            if ok:
+               mk_idx[idx][time_idx] = dt_time.index(time)
+               exist_list[idx][time_idx]= True
+   
+    mk_idx = [ tuple(ii) for ii in mk_idx ]
+    exist_list = [ tuple(ii) for ii in exist_list ]
     if pos:
         return mk_idx,exist_list
     else:
@@ -150,7 +160,7 @@ def read_log(fn,awd_dat={}):
              y = en_time[mm_log_idx]
              z = np.array(log_dat['Comment'])[mm_log_idx]
              mm_time = list(zip(y,x,z))
-             mm_idx, pos =  get_idx(awd_dat['DateTime'],mm_time,pos=True)
+             mm_idx, pos =  get_idx(awd_dat['dt_list'],mm_time,pos=True)
              for idx in range(0,len(mm_idx)):
                  if pos[idx]==(False,False):
                       mm_idx.pop(idx)
@@ -162,7 +172,7 @@ def read_log(fn,awd_dat={}):
     else:
         mk_list = list(zip(st_time,en_time,np.array(log_dat['Comment'])))
         #mk_idx, pos =  get_idx(awd_dat['DateTime'],mk_time,pos=True)
-        mk_idx,pos=get_idx(awd_dat['DateTime'],mk_list,pos=True)
+        mk_idx,pos=get_idx(awd_dat['dt_list'],mk_list,pos=True)
         #adjust for comment blocks that are totally out of range of AWD
         for idx in range(0,len(mk_idx)):
             if pos[idx]==(False,False):
