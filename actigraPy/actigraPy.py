@@ -159,13 +159,6 @@ def read_log(fn,awd_dat={}):
              x = st_time[mm_log_idx]
              y = en_time[mm_log_idx]
              z = np.array(log_dat['Comment'])[mm_log_idx]
-<<<<<<< HEAD
-             mm_time = list(zip(y,x,z))
-             mm_idx, pos =  get_idx(awd_dat['dt_list'],mm_time,pos=True)
-             for idx in range(0,len(mm_idx)):
-                 if pos[idx]==(False,False):
-                      mm_idx.pop(idx)
-=======
              mm_time = list(zip(x,y,z))
              mm_idx, pos =  get_idx(awd_dat['DateTime'],mm_time,pos=True)
              rm_list=[]
@@ -175,7 +168,7 @@ def read_log(fn,awd_dat={}):
              rm_list.sort(reverse=True)
              for idx in rm_list:
                  mm_idx.pop(idx)
->>>>>>> 6264e3b6759562644464695150d4ce80b1a8fc06
+
              mk_dict[mm]=mm_idx
         log_dat['mks'] = mk_dict 
         #log_dat['idx'] =  mk_idx
