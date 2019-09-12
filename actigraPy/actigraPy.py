@@ -9,14 +9,13 @@ JWE Jan 2019
 """
 
 import numpy as np
-import os, sys
+import os, sys, csv, json
 import datetime as dt
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from scipy.stats import zscore
 from copy import deepcopy
-import csv
 import tkinter as tk
 #from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.backends.backend_agg import FigureCanvasAgg
@@ -27,7 +26,23 @@ maybe make a global var for dat?
 """
 dt_fmt = '%d-%b-%y %I:%M %p'
 
-def read_dat(fn_pref):
+def write_json(out_dir,sub,awd_dat,mk_idx,other_stuff={}):
+
+   json_dat = {}
+   json_dat['dat_fn'] = f"sub-{sub}_dat.csv"  # check file exists
+   json_dat['header'] = awd_dat['hdr']
+   json_dat['start'] = awd_dat['start']   # needs info about where the start and end are from
+   json_dat['end'] = awd_dat['end']
+   #json_dat['marker_types'] = markers['mk_com']
+   json_dat['mk_idx'] = mk_idx #markers['mk_idx']
+
+   json_dat.update(other_stuff)
+
+   with open(f'{out_dir}/sub-{sub}.json', 'w') as outfile:
+       json.dump(json_dat, outfile,indent=4)
+
+
+def read_dat(fn_pref,load_json=True):
     """
     need to add the column names or something, need to add headers, also add marker idx as dict to output?
     """
@@ -38,21 +53,43 @@ def read_dat(fn_pref):
     #    dat = list(reader)   
     
     dat = pd.read_csv(fn_pref + '_dat.csv',keep_default_na=False)
-    #dat = dat.get_values()   # this may not be the best
+    if load_json:
+       with open(f'{fn_pref}.json','r') as json_file:
+          json_dat = json.load(json_file)
+
 
     # get the idx for the markers from the dat file
     r,c = np.shape(dat)
     mks = list(dat.columns[3:])
-    #print(c)
-    marker_idx = {}
+    # this assumes the same mks in the json and the dat file,
+    # should load what there is for both files... 
+    json_mk_idx = {}
+    dat_mk_idx = {}
     #for ii in np.arange(c-2)+2:
     for mm in mks:
         #tmp = [ idx for idx,val in enumerate(dat[mm].values) if val=='1' ]  #was mm
-        tmp = np.where(np.diff(dat[mm].astype(int)))[0] + 1
-        #print(tmp)
-        marker_idx[mm] = tmp
+        if load_json and (mm in json_dat['mk_idx'].keys()):
+            print("found marker comments in json file")
+            json_mk_idx[mm] = [ tuple(ii) for ii in json_dat['mk_idx'][mm] ]
 
-    return dat,marker_idx
+        # this could be else but maybe they don't match?
+        tmp = np.where(np.diff(dat[mm].astype(int)))[0] + 1
+        #if not even make it even by adding a marker at the very end
+        if len(tmp)%2:
+           # not even
+           print(f"an uneven number of markers were found for {mm}, adding something to the end, this may make things ill behaved...")
+           tmp = list(tmp)
+           tmp.append(r)
+         
+        zipped = list(zip(tmp[0::2], tmp[1::2],[""]*(len(tmp)//2)))
+        dat_mk_idx[mm] = zipped
+
+         #check json and dat vals are the same?
+         # for now just return both
+    if load_json:
+        return dat,json_mk_idx,dat_mk_idx
+    else:
+        return dat,marker_idx
 
 def get_idx(dat_time,mk_times,pos=False):
     """
@@ -521,7 +558,6 @@ def read_AWD(fn):
    # get start dt
    #start_dt = dt.datetime.strptime(' '.join([hdr['start_date'],hdr['start_time']]),'%d-%b-%Y %H:%M')
    start_dt = dt.datetime.strptime(' '.join([hdr[1],hdr[2]]),'%d-%b-%Y %H:%M')
-   
 
    # create list of dts by increment of a minute to end of data
    inc = dt.timedelta(minutes=1)
