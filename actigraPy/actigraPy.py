@@ -28,8 +28,10 @@ dt_fmt = '%d-%b-%y %I:%M %p'
 
 def write_json(out_dir,sub,awd_dat,mk_idx,other_stuff={}):
 
+   # if the json file exists then update the file?
+
    json_dat = {}
-   json_dat['dat_fn'] = f"sub-{sub}_dat.csv"  # check file exists
+   json_dat['dat_fn'] = f"sub-{sub}.csv"  # check file exists
    json_dat['header'] = awd_dat['hdr']
    json_dat['start'] = awd_dat['start']   # needs info about where the start and end are from
    json_dat['end'] = awd_dat['end']
@@ -52,7 +54,10 @@ def read_dat(fn_pref,load_json=True):
     #    #csv_reader = csv.DictReader(csv_file)
     #    dat = list(reader)   
     
-    dat = pd.read_csv(fn_pref + '_dat.csv',keep_default_na=False)
+    dat = pd.read_csv(f'{fn_pref}.csv',keep_default_na=False)
+    # temp fix
+    dat.replace('','0.0',inplace=True)
+    #dat = pd.read_csv(fn_pref + '_dat.csv',keep_default_na=False)
     if load_json:
        with open(f'{fn_pref}.json','r') as json_file:
           json_dat = json.load(json_file)
@@ -73,7 +78,12 @@ def read_dat(fn_pref,load_json=True):
             json_mk_idx[mm] = [ tuple(ii) for ii in json_dat['mk_idx'][mm] ]
 
         # this could be else but maybe they don't match?
-        tmp = np.where(np.diff(dat[mm].astype(int)))[0] + 1
+        # this tmp stuff should be cleaned up, but it does work...
+        tmp_mm = list(dat[mm])
+        tmp_mm.insert(0,0)
+        tmp_mm=list(map(float, tmp_mm))
+        #tmp = np.where(np.diff(dat[mm].astype(float)))[0] + 1
+        tmp = np.where(np.diff(tmp_mm))[0]
         #if not even make it even by adding a marker at the very end
         if len(tmp)%2:
            # not even
@@ -87,9 +97,9 @@ def read_dat(fn_pref,load_json=True):
          #check json and dat vals are the same?
          # for now just return both
     if load_json:
-        return dat,json_mk_idx,dat_mk_idx
+        return dat,dat_mk_idx,json_dat,json_mk_idx
     else:
-        return dat,marker_idx
+        return dat,dat_mk_idx
 
 def get_idx(dat_time,mk_times,pos=False):
     """
@@ -345,7 +355,8 @@ def code_act(idat):
 def clip_dat(lim,awd_dat):
 
    # get all the same length data from the dict
-   dat = { ii: awd_dat[ii] for ii in ['DateTime','activity', 'dt_list','M'] }
+   # removed dt_list...
+   dat = { ii: awd_dat[ii] for ii in ['DateTime','activity','M'] }
    dat = pd.DataFrame.from_dict(dat)
 
    tmp = get_idx(awd_dat['DateTime'],lim)
@@ -354,7 +365,7 @@ def clip_dat(lim,awd_dat):
    clipped_dat = clipped_dat.to_dict(orient='list')
 
    clipped_dat['N'] = len(clipped_dat['activity'])
-   clipped_dat['hdr'] = awd_dat['hdr']
+   #clipped_dat['hdr'] = awd_dat['hdr']
 
    return clipped_dat
 
@@ -386,16 +397,17 @@ def despike(dat,zlev=4,win=2):
  
    return nap
 
-def plot_awd(awd_dat,mk_idx,plot_type='single',show=True,fn_pref='',max_act=-1,debug=False):
+
+def plot_awd(act_date,mk_idx,plot_type='single',show=True,fn_pref='',max_act=-1,debug=False):
 #def plot_awd(DateTime,idat,list_idx,plot_type='single',comments=[],show=True,fn_pref='',max_act=-1,debug=False):
-   idat = awd_dat['activity']
+   idat = act_date['activity']
 
    # want to plot activity data by day
    # get number of days, then split data by days, the bar plota
 
    #idat = np.array([ int(ii) for ii in dat if ii is not('M') ] ) 
 
-   day_list = [ ii.split()[0] for ii in awd_dat['DateTime'] ]
+   day_list = [ ii.split()[0] for ii in act_date['DateTime'] ]
    days = list(np.unique(day_list))
    days.sort(key=lambda x: dt.datetime.strptime(x, '%d-%b-%y'))
    #print(days)
@@ -424,7 +436,7 @@ def plot_awd(awd_dat,mk_idx,plot_type='single',show=True,fn_pref='',max_act=-1,d
       # get data that matches (you really only have to do this for the first day (and last sort of) because it should be 1440 rows per full day
       dd_idx = [idx for idx,ddd  in enumerate(day_list) if ddd == day]
       if not max_act > 0:
-         max_act = max(awd_dat['activity'])
+         max_act = max(idat)
       ax.set_ylim([0,max_act])
       comment_height = max_act/2
 
@@ -441,8 +453,8 @@ def plot_awd(awd_dat,mk_idx,plot_type='single',show=True,fn_pref='',max_act=-1,d
       delt_idx = max_idx-min_idx # this should just be the number of days plotted in a row...
 
       if dd==0:
-          offset = 1439-max_idx
-          delt_idx = 1439
+          offset = 1440-max_idx #1439
+          delt_idx = 1440
    
       
       if debug:
@@ -451,7 +463,7 @@ def plot_awd(awd_dat,mk_idx,plot_type='single',show=True,fn_pref='',max_act=-1,d
       #tmp = idat[dd_idx]
       plt.bar(np.arange(offset,delt_idx),idat[min_idx:max_idx],width=1)
      
-      colours = ['blue','red','darkred','pink','lightcyan']
+      colours = ['blue','red','lightgray','thistle','darkred','pink','lightcyan']
       for cc,mm in enumerate(mk_idx.keys()):
           mk_dd_idx= np.where([(x[1]>min_idx)&(x[0]<max_idx) for x in mk_idx[mm]])[0].tolist()
           mk_dd = []
