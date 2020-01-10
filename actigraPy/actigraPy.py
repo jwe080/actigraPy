@@ -159,23 +159,21 @@ def read_log(fn,awd_dat={}):
              x = st_time[mm_log_idx]
              y = en_time[mm_log_idx]
              z = np.array(log_dat['Comment'])[mm_log_idx]
-<<<<<<< HEAD
-             mm_time = list(zip(y,x,z))
+             mm_time = list(zip(x,y,z))
              mm_idx, pos =  get_idx(awd_dat['dt_list'],mm_time,pos=True)
              for idx in range(0,len(mm_idx)):
                  if pos[idx]==(False,False):
                       mm_idx.pop(idx)
-=======
-             mm_time = list(zip(x,y,z))
-             mm_idx, pos =  get_idx(awd_dat['DateTime'],mm_time,pos=True)
-             rm_list=[]
-             for idx,tup in enumerate(pos):
-                 if tup == (False,False):
-                      rm_list.append(idx)
-             rm_list.sort(reverse=True)
-             for idx in rm_list:
-                 mm_idx.pop(idx)
->>>>>>> 6264e3b6759562644464695150d4ce80b1a8fc06
+             #mm_time = list(zip(x,y,z))
+             #mm_idx, pos =  get_idx(awd_dat['DateTime'],mm_time,pos=True)
+             #rm_list=[]
+             #for idx,tup in enumerate(pos):
+             #    if tup == (False,False):
+             #         rm_list.append(idx)
+             #rm_list.sort(reverse=True)
+             #for idx in rm_list:
+             #    mm_idx.pop(idx)
+
              mk_dict[mm]=mm_idx
         log_dat['mks'] = mk_dict 
         #log_dat['idx'] =  mk_idx
@@ -379,18 +377,25 @@ def plot_awd(awd_dat,mk_idx,plot_type='single',show=True,fn_pref='',max_act=-1,d
 
    if plot_type == 'double':
       ww = 12
+      wh = n_days*0.3
+   elif plot_type == 'wide':
+      ww = 6
+      wh = n_days*0.3
    else:
       ww = 6
-
    awd_fig = plt.figure(facecolor='w',figsize=(ww,wh))
    awd_fig.clear()
-
+   try:
+      sub=awd_dat['hdr']['sub']
+   except:
+      sub="n.s."
+   awd_fig.suptitle(f"Activity plots for {sub} from {days[0]} to {days[-1]}, scale:{max_act}")
    #for dd,day in enumerate(days[:28]):
    #for dd,day in enumerate(days[28:35]):
    for dd,day in enumerate(days):
       print(day)
-      #ax = awd_fig.add_subplot(n_days,1,dd+1)
       ax = awd_fig.add_subplot(n_days,1,dd+1)
+      #ax = awd_fig.add_subplot(n_days,1,dd+1, adjustable='box',aspect=asp)
       # get data that matches (you really only have to do this for the first day (and last sort of) because it should be 1440 rows per full day
       dd_idx = [idx for idx,ddd  in enumerate(day_list) if ddd == day]
       if not max_act > 0:
@@ -402,21 +407,28 @@ def plot_awd(awd_dat,mk_idx,plot_type='single',show=True,fn_pref='',max_act=-1,d
 
       max_idx = np.max(dd_idx)
       if plot_type == 'double':
+         max_minutes = (1440)*2-1
          tmp = max_idx + 1440
          if tmp < len(idat): 
             max_idx = max_idx + 1440
          else:
             max_idx = len(idat)
+      else:
+         max_minutes = 1440-1
       offset =0
       delt_idx = max_idx-min_idx # this should just be the number of days plotted in a row...
 
       if dd==0:
-          offset = 1439-max_idx
-          delt_idx = 1439
+          if plot_type == 'double':
+              offset = max_minutes - max_idx
+              delt_idx = max_minutes
+          else:
+              offset = max_minutes-max_idx
+              delt_idx = max_minutes
    
       
       if debug:
-        print(min_idx,max_idx)
+        print(min_idx,max_idx,offset,delt_idx)
 
       #tmp = idat[dd_idx]
       plt.bar(np.arange(offset,delt_idx),idat[min_idx:max_idx],width=1)
@@ -440,22 +452,38 @@ def plot_awd(awd_dat,mk_idx,plot_type='single',show=True,fn_pref='',max_act=-1,d
               print("plotting: %d,%d from %s"%(x1,x2,mm))
               ax.axvspan(x1,x2, alpha=0.3, color=colours[np.mod(cc,len(colours))])
               jitter = (cc % 2) * comment_height // 4
-              ax.text(x1,comment_height+jitter,ii[2])
+              if x1+offset < 1430:# to make sure comments don't spill over
+                 #BUT some comments may get hidden...
+                 ax.text(x1+offset,comment_height+jitter,ii[2])
 
             #for mm in M_idx[m_idx]:
             #   ax.text(mm-min_idx,idat[mm],'M')
                #print(mm)
 
-      ax.set_ylabel(day)
-      ax.set_xticks(np.arange(0,1439,60))
       if plot_type=='double':
          ax.set_xticklabels(list(np.arange(24))*2)
+         ax.set_xlim((0,48))
+         if dd < len(days)-1:
+            ax.set_xticklabels([])
+      elif plot_type=='wide':
+         ax.set_xlim((0,23))
+         ax.set_xticklabels(np.arange(24))
+         if dd < len(days)-1:
+            ax.set_xticklabels([])
       else:
+         ax.set_xlim((0,23))
          ax.set_xticklabels(np.arange(24))
       #ax.axis('off')
+      ax.set_xticks(np.arange(0,max_minutes,60))
       ax.spines["top"].set_visible(False)
       ax.spines["right"].set_visible(False)
       ax.spines["bottom"].set_visible(False)
+
+      if plot_type=='wide' or 'double':
+         ax.set_ylabel(day,rotation=0,ha='right',va='center')
+         ax.set_yticklabels([])
+      else:
+         ax.set_ylabel(day)
 
    # legend, do once for all keys
    all_patch = [] # for legend
@@ -464,38 +492,45 @@ def plot_awd(awd_dat,mk_idx,plot_type='single',show=True,fn_pref='',max_act=-1,d
       all_patch.append(mm_patch) 
       plt.legend(handles=all_patch)
 
-   plt.tight_layout()
+
+   if plot_type=='wide':
+      #ax.set_ylabel(day,rotation=0)
+      #plt.subplots_adjust(hspace=0)
+      plt.tight_layout(h_pad=0,rect=[0, 0.03, 1, 0.95])
+   else:
+      plt.tight_layout(rect=[0,0.03,1,0.95])
+
 
    #if not fn_pref: fn_pref = 'test'
    if fn_pref:
       print('Saving... ' + fn_pref + '.png')
-      awd_fig.savefig(fn_pref + '.png', bbox_inches='tight')
+      awd_fig.savefig(fn_pref + '.png', bbox_inches='tight',dpi=300)
       print('Done')
 
-   if show:
-      root=tk.Tk()
-      fw = ww*100
-      fh = 800
-      frame=tk.Frame(root,width=fw,height=fh)
-      frame.grid(row=0,column=0)
-      canvas=tk.Canvas(frame,bg='#FFFFFF',width=fw,height=fh,scrollregion=(0,0,fw,4800))  #600?
-      #hbar=tk.Scrollbar(frame,orient=tk.HORIZONTAL)
-      #hbar.pack(side=tk.BOTTOM,fill=tk.X)
-   #  #hbar.config(command=canvas.xview)
-      vbar=tk.Scrollbar(frame,orient=tk.VERTICAL)
-      vbar.pack(side=tk.RIGHT,fill=tk.Y)
-      vbar.config(command=canvas.yview)
-      canvas.config(width=fw,height=fh)
-      canvas.config(yscrollcommand=vbar.set)
-      canvas.pack(side=tk.LEFT,expand=True,fill=tk.BOTH)
-   
-      fig_x, fig_y = 0,0
-      fig_photo = draw_figure(canvas, awd_fig, loc=(fig_x, fig_y))
-      fig_w, fig_h = fig_photo.width(), fig_photo.height()
-   
-      #canvas.postscript(file="tmp.ps", colormode="color")
-   
-      root.mainloop()
+#   if show:
+#      root=tk.Tk()
+#      fw = ww*100
+#      fh = 800
+#      frame=tk.Frame(root,width=fw,height=fh)
+#      frame.grid(row=0,column=0)
+#      canvas=tk.Canvas(frame,bg='#FFFFFF',width=fw,height=fh,scrollregion=(0,0,fw,4800))  #600?
+#      #hbar=tk.Scrollbar(frame,orient=tk.HORIZONTAL)
+#      #hbar.pack(side=tk.BOTTOM,fill=tk.X)
+#   #  #hbar.config(command=canvas.xview)
+#      vbar=tk.Scrollbar(frame,orient=tk.VERTICAL)
+#      vbar.pack(side=tk.RIGHT,fill=tk.Y)
+#      vbar.config(command=canvas.yview)
+#      canvas.config(width=fw,height=fh)
+#      canvas.config(yscrollcommand=vbar.set)
+#      canvas.pack(side=tk.LEFT,expand=True,fill=tk.BOTH)
+#   
+#      fig_x, fig_y = 0,0
+#      fig_photo = draw_figure(canvas, awd_fig, loc=(fig_x, fig_y))
+#      fig_w, fig_h = fig_photo.width(), fig_photo.height()
+#   
+#      #canvas.postscript(file="tmp.ps", colormode="color")
+#   
+#      root.mainloop()
 
 def read_AWD(fn):
    
@@ -527,8 +562,14 @@ def read_AWD(fn):
 
    # get start dt
    #start_dt = dt.datetime.strptime(' '.join([hdr['start_date'],hdr['start_time']]),'%d-%b-%Y %H:%M')
-   start_dt = dt.datetime.strptime(' '.join([hdr[1],hdr[2]]),'%d-%b-%Y %H:%M')
-   
+   # from awd file
+   try:
+      start_dt = dt.datetime.strptime(' '.join([hdr[1],hdr[2]]),'%d-%b-%Y %H:%M')
+   except:
+      try:
+         start_dt = dt.datetime.strptime(' '.join([hdr[1],hdr[2]]),'%d-%b-%y %H:%M')
+      except:
+         print("Date format in AWD file is not recognized")
 
    # create list of dts by increment of a minute to end of data
    inc = dt.timedelta(minutes=1)
@@ -564,6 +605,7 @@ def write_Mtimes(awd_dat,mk_idx,fn_pref,fn_suff=''):
 
    dat['marker'] = [x[3] for x in mk_list]
    dat['Comment'] = [x[2] for x in mk_list]
+   dat = dat[['OffDate','OffTime','OnDate','OnTime','marker','Comment']]
    dat.to_csv(fn_pref + '_Mtimes'+fn_suff+'.csv', sep=',',index=False)
 
    return dat
@@ -616,12 +658,13 @@ def get_markers(awd_dat,log_fn=[]):
    # figure out if the start block is act/rest, zero/non-zero
    tmp = pdat[tp_idx[0]:tp_idx[1]]
    st_block = not(any(tmp))  # true if zero/not active
-
+   #print(f"first {st_block}")
    #print(st_block,tmp,tp_idx[0],pdat[tp_idx[0]:tp_idx[2]])
   
    # remove short active segments, may wish to do this only for overnight periods?
    shorts = len_segs<5
-   act_segs = [not(st_block),st_block]*round(len(seg_idx)/2) 
+   act_segs = [not(st_block),st_block]*round(len(seg_idx)/2)
+   #act_segs = [not(st_block),st_block]*int(round(len(seg_idx)/2))
    # remove short act segments
    # for an even number of points there's an uneven number of segments...
    rem = shorts*act_segs[:len(shorts)]  # bad kludge
@@ -640,7 +683,8 @@ def get_markers(awd_dat,log_fn=[]):
       new_tp_idx = np.concatenate([np.zeros(1),new_tp_idx])
    if np.mod(len(new_tp_idx),2) == 0:
       new_tp_idx = np.concatenate([new_tp_idx,np.ones(1)*N-1])   # insert the last point
-
+ 
+   #print(len(mask),mask[0:10])
    st_block = mask[0] == 0  # true if zero/not active, there is a better way to code this...
 
    #print(st_block,tmp,tp_idx[0],tp_idx[1],dat)
@@ -684,6 +728,7 @@ def get_markers(awd_dat,log_fn=[]):
 
    th = 3
    mtp_idx = []
+   #print(len(wM_idx))
    # if there are remaining markers, see if they overlap with z
    if len(wM_idx) > 0:
       for mm in wM_idx:
@@ -693,20 +738,30 @@ def get_markers(awd_dat,log_fn=[]):
             mtp_idx.append(match_idx_tp)
 
    # of course, markers don't necessarily come in pairs 'cause that'd be too easy.
+   tp_idx = np.unique(tp_idx)  # in case there are dups (1 2 2 3) this happened once...
    # basically, there should be an even and odd tp_idx, if not add it.
    tmp_idx = []
+   tmp_pair = []
    for ii in mtp_idx:
       tmp = np.where(tp_idx==ii)[0][0]
       eo = np.mod(tmp,2)
+      #print(f"{eo},{tmp},",end="")
       tmp_idx.append(ii)
       if (eo == 0 and st_block==0) or ( eo == 1 and st_block >0 ) :  # may need to account for start act/non
          tmp_idx.append(tp_idx[tmp+1])
+         tmp_pair.append((ii,tp_idx[tmp+1]))
       else:
          if tmp != N-2:
             tmp_idx.append(tp_idx[tmp-1])
+            tmp_pair.append((tp_idx[tmp-1],ii))
+         else:
+            tmp_idx.append(tp_idx[-1])
+            tmp_pair.append((ii,tp_idx[-1]))
+            
 
    tmp_idx = np.unique(tmp_idx)  # in case there are actually pairs remove the dups, yes, being lazy.
 
+   #print(len(tmp_idx),tmp_idx)
    keep_idx = keep_idx + list(tmp_idx)
 
    keep_idx.sort()  # really bad idea...  
@@ -714,7 +769,8 @@ def get_markers(awd_dat,log_fn=[]):
    # the sort below should really be correct for keeping segment start/end pairs together
    # however, as overlapping M and z segments aren't currently checked the above sort is a
    # dirty workaround, which will probably create problems...
-   
+ 
+
    sort_tmp = [ (val,keep_idx[2*ii+1]) for ii,val in enumerate(keep_idx[::2])]
 
    sort_tmp.sort(key=lambda tup: tup[0])
