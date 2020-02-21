@@ -40,7 +40,7 @@ def write_json(out_dir,sub,awd_dat,mk_idx,other_stuff={}):
 
    json_dat.update(other_stuff)
 
-   with open(f'{out_dir}/sub-{sub}.json', 'w') as outfile:
+   with open(f'{out_dir}/{sub}_dat.json', 'w') as outfile:
        json.dump(json_dat, outfile,indent=4)
 
 
@@ -74,22 +74,23 @@ def read_dat(fn_pref,load_json=True):
     for mm in mks:
         #tmp = [ idx for idx,val in enumerate(dat[mm].values) if val=='1' ]  #was mm
         if load_json and (mm in json_dat['mk_idx'].keys()):
-            print("found marker comments in json file")
+            print(f"found marker {mm} comments in json file")
             json_mk_idx[mm] = [ tuple(ii) for ii in json_dat['mk_idx'][mm] ]
 
         # this could be else but maybe they don't match?
         # this tmp stuff should be cleaned up, but it does work...
         tmp_mm = list(dat[mm])
         tmp_mm.insert(0,0)
-        tmp_mm=list(map(float, tmp_mm))
+        tmp_mm=list(map(int, tmp_mm))
         #tmp = np.where(np.diff(dat[mm].astype(float)))[0] + 1
         tmp = np.where(np.diff(tmp_mm))[0]
+        tmp = [ int(ii) for ii in tmp ]  # astype(int) didn't seem to work? needed this for json conversion?
         #if not even make it even by adding a marker at the very end
         if len(tmp)%2:
            # not even
            print(f"an uneven number of markers were found for {mm}, adding something to the end, this may make things ill behaved...")
-           tmp = list(tmp)
-           tmp.append(r)
+           tmp = [ int(ii) for ii in tmp] # bad bad
+           tmp.append(int(r))
          
         zipped = list(zip(tmp[0::2], tmp[1::2],[""]*(len(tmp)//2)))
         dat_mk_idx[mm] = zipped
@@ -141,7 +142,7 @@ def get_idx(dat_time,mk_times,pos=False):
     else:
         return mk_idx
     
-def read_log(fn,awd_dat={}):
+def read_log(fn,awd_dat):
 
     dt_fmt = '%d-%b-%y %I:%M %p'
 
@@ -207,7 +208,7 @@ def read_log(fn,awd_dat={}):
              y = en_time[mm_log_idx]
              z = np.array(log_dat['Comment'])[mm_log_idx]
              mm_time = list(zip(x,y,z))
-             mm_idx, pos =  get_idx(awd_dat['DateTime'],mm_time,pos=True)
+             mm_idx, pos =  get_idx(awd_dat['dt_list'],mm_time,pos=True)
              rm_list=[]
              for idx,tup in enumerate(pos):
                  if tup == (False,False):
@@ -234,6 +235,8 @@ def read_log(fn,awd_dat={}):
             mk_idx.pop(idx)
 
         log_dat['idx']=mk_idx
+    
+    log_dat['awd_dat']=awd_dat
 
     return log_dat,kw_dat
 
@@ -351,7 +354,7 @@ def code_act(idat):
 
    return act,a40,a20
 
-def clip_dat(lim,awd_dat):
+def clip_dat(lim,awd_dat,mk_idx):
 
    # get all the same length data from the dict
    # removed dt_list...
@@ -363,10 +366,15 @@ def clip_dat(lim,awd_dat):
    clipped_dat =  dat.iloc[st:en,:]
    clipped_dat = clipped_dat.to_dict(orient='list')
 
+   # also iterate through all the markers and subtract the st amount of minutes
+   clipped_mk_idx = {}
+   for kk in mk_idx.keys():
+      clipped_mk_idx[kk] = [ (ii-st,jj-st,cc) for (ii,jj,cc) in mk_idx[kk] ]
+
    clipped_dat['N'] = len(clipped_dat['activity'])
    #clipped_dat['hdr'] = awd_dat['hdr']
 
-   return clipped_dat
+   return clipped_dat,clipped_mk_idx
 
 def despike(dat,zlev=4,win=2):
    # start with simple cutoff and replace with median or something.
@@ -416,28 +424,46 @@ def plot_awd(act_date,mk_idx,plot_type='single',show=True,fn_pref='',max_act=-1,
  
    print(n_days)
      
-   wh = round(n_days/7)*8
-
+   ww = 8
+   wh = 10.5
    if plot_type == 'double':
-      ww = 12
-      wh = n_days*0.3
+      n_plots = 18
    elif plot_type == 'wide':
-      ww = 6
-      wh = n_days*0.3
+      n_plots = 36
    else:
+      #original, just stretches window to keep plots fat
+      n_plots=n_days
+      wh = round(n_days/7)*8
       ww = 6
-   awd_fig = plt.figure(facecolor='w',figsize=(ww,wh))
-   awd_fig.clear()
-   try:
-      sub=awd_dat['hdr']['sub']
-   except:
-      sub="n.s."
-   awd_fig.suptitle(f"Activity plots for {sub} from {days[0]} to {days[-1]}, scale:{max_act}")
+   
+   # subtracting 1 for 0 based counting...
+   n_figs = n_days//n_plots + ( 1 if np.mod(n_days,n_plots) > 0 else 0 )
+   awd_figs = ['']*n_figs
+   print(n_figs,n_plots)
+   for ii in range(n_figs):
+       # assume letter sized page 0.25" margin, don't ask about landscape
+       awd_figs[ii] = plt.figure(facecolor='w',figsize=(ww,wh))
+       awd_figs[ii].clear()
+       try:
+           sub=act_date['hdr']['sub']
+       except:
+           sub="n.s."
+       sidx = ii*n_plots
+       tmp = (ii+1)*n_plots - 1
+       eidx = tmp if tmp < n_days else -1
+       #print(sidx,eidx,n_days)
+       if fn_pref:
+          fn_bit = ", file: " + os.path.basename(fn_pref)
+       else:
+          fn_bit =""
+       awd_figs[ii].suptitle(f"Activity plots for {sub} from {days[sidx]} to {days[eidx]}, scale:{max_act}{fn_bit}")
+
    #for dd,day in enumerate(days[:28]):
-   #for dd,day in enumerate(days[28:35]):
    for dd,day in enumerate(days):
       print(day)
-      ax = awd_fig.add_subplot(n_days,1,dd+1)
+      fig_idx = dd // n_plots
+      ax = awd_figs[fig_idx].add_subplot(n_plots,1,dd-fig_idx*n_plots+1)
+      #ax = awd_fig.add_subplot(n_days,1,dd+1)
       #ax = awd_fig.add_subplot(n_days,1,dd+1, adjustable='box',aspect=asp)
       # get data that matches (you really only have to do this for the first day (and last sort of) because it should be 1440 rows per full day
       dd_idx = [idx for idx,ddd  in enumerate(day_list) if ddd == day]
@@ -474,7 +500,7 @@ def plot_awd(act_date,mk_idx,plot_type='single',show=True,fn_pref='',max_act=-1,
         print(min_idx,max_idx,offset,delt_idx)
 
       #tmp = idat[dd_idx]
-      plt.bar(np.arange(offset,delt_idx),idat[min_idx:max_idx],width=1)
+      ax.bar(np.arange(offset,delt_idx),idat[min_idx:max_idx],width=1)
      
       colours = ['blue','red','lightgray','thistle','darkred','pink','lightcyan']
       for cc,mm in enumerate(mk_idx.keys()):
@@ -503,21 +529,22 @@ def plot_awd(act_date,mk_idx,plot_type='single',show=True,fn_pref='',max_act=-1,
             #   ax.text(mm-min_idx,idat[mm],'M')
                #print(mm)
 
+      fs = 6
       if plot_type=='double':
-         ax.set_xticklabels(list(np.arange(24))*2)
-         ax.set_xlim((0,48))
-         if dd < len(days)-1:
+         ax.set_xticklabels(list(np.arange(24))*2,size=fs)
+         #ax.set_xlim((0,48+1))
+         if dd % n_plots < n_plots-1 or dd == n_days -1:
             ax.set_xticklabels([])
       elif plot_type=='wide':
-         ax.set_xlim((0,23))
-         ax.set_xticklabels(np.arange(24))
-         if dd < len(days)-1:
+         #ax.set_xlim((0,24))
+         ax.set_xticklabels(np.arange(23+1),size=fs)
+         if dd % n_plots < n_plots-1 or dd == n_days-1:
             ax.set_xticklabels([])
       else:
-         ax.set_xlim((0,23))
-         ax.set_xticklabels(np.arange(24))
+         #ax.set_xlim((0,24))
+         ax.set_xticklabels(np.arange(23+1),size=fs)
       #ax.axis('off')
-      ax.set_xticks(np.arange(0,max_minutes,60))
+      ax.set_xticks(np.arange(0,max_minutes+60,60))
       ax.spines["top"].set_visible(False)
       ax.spines["right"].set_visible(False)
       ax.spines["bottom"].set_visible(False)
@@ -528,27 +555,30 @@ def plot_awd(act_date,mk_idx,plot_type='single',show=True,fn_pref='',max_act=-1,
       else:
          ax.set_ylabel(day)
 
-   # legend, do once for all keys
-   all_patch = [] # for legend
-   for cc,mm in enumerate(mk_idx.keys()):
-      mm_patch = mpatches.Patch(color=colours[np.mod(cc,len(colours))], label=mm,alpha=0.3)
-      all_patch.append(mm_patch) 
-      plt.legend(handles=all_patch)
+      # legend, do once for all keys on each figure
+      if dd+1 % n_plots == 0:
+         all_patch = [] # for legend
+         for cc,mm in enumerate(mk_idx.keys()):
+            mm_patch = mpatches.Patch(color=colours[np.mod(cc,len(colours))], label=mm,alpha=0.3)
+            all_patch.append(mm_patch) 
+            ax.legend(handles=all_patch)
 
 
-   if plot_type=='wide':
-      #ax.set_ylabel(day,rotation=0)
-      #plt.subplots_adjust(hspace=0)
-      plt.tight_layout(h_pad=0,rect=[0, 0.03, 1, 0.95])
-   else:
-      plt.tight_layout(rect=[0,0.03,1,0.95])
-
-
-   #if not fn_pref: fn_pref = 'test'
-   if fn_pref:
-      print('Saving... ' + fn_pref + '.png')
-      awd_fig.savefig(fn_pref + '.png', bbox_inches='tight',dpi=300)
-      print('Done')
+   for ii,fig in enumerate(awd_figs):
+      if plot_type=='wide' or plot_type=='double':
+         #ax.set_ylabel(day,rotation=0)
+         #plt.subplots_adjust(hspace=0)
+         fig.tight_layout(h_pad=0,rect=[0, 0.03, 1, 0.95])
+      else:
+         fig.tight_layout(rect=[0,0.03,1,0.95])
+   
+   
+      #if not fn_pref: fn_pref = 'test'
+      if fn_pref:
+         fn_out = f"{fn_pref}_{str(ii+1)}.png"
+         print('Saving... ' + fn_out)
+         fig.savefig(fn_out, bbox_inches='tight',dpi=300)
+         print('Done')
 
 #   if show:
 #      root=tk.Tk()
